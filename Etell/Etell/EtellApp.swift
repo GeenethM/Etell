@@ -6,11 +6,16 @@
 //
 
 import SwiftUI
+import Firebase
 
 @main
 struct EtellApp: App {
     @StateObject private var authService = FirebaseAuthService()
     @StateObject private var notificationService = NotificationService()
+    
+    init() {
+        FirebaseApp.configure()
+    }
     
     var body: some Scene {
         WindowGroup {

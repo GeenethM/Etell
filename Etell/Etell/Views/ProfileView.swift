@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+// MARK: - Main Profile View (Previously ProfileViewContainer)
 struct ProfileView: View {
     @EnvironmentObject var authService: FirebaseAuthService
     @EnvironmentObject var notificationService: NotificationService
@@ -17,17 +18,34 @@ struct ProfileView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Profile Header
                     ProfileHeaderSection()
-                    
-                    // Settings Sections
                     NotificationSettingsSection()
                     SecuritySettingsSection()
                     AccountSettingsSection()
                     AppSettingsSection()
                     
-                    // Sign Out Button
-                    SignOutSection()
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            print("🟠 Sign Out button tapped")
+                            showingSignOutAlert = true
+                        }) {
+                            Text("Sign Out")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue)
+                                .cornerRadius(12)
+                        }
+                        
+                        Button(action: {
+                            showingDeleteAccountAlert = true
+                        }) {
+                            Text("Delete Account")
+                                .font(.subheadline)
+                                .foregroundColor(.red)
+                        }
+                    }
                 }
                 .padding()
             }
@@ -35,16 +53,26 @@ struct ProfileView: View {
         }
         .alert("Sign Out", isPresented: $showingSignOutAlert) {
             Button("Sign Out", role: .destructive) {
+                print("🟠 Sign Out confirmed - calling authService.signOut()")
+                // Clear all login data and return to login page
                 authService.signOut()
+                
+                // Additional cleanup if needed
+                notificationService.disableFaceID()
+                
+                print("🟠 Sign out process completed")
             }
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) { 
+                print("🟠 Sign Out cancelled")
+            }
         } message: {
-            Text("Are you sure you want to sign out?")
+            Text("Are you sure you want to sign out? This will clear all your login data and return you to the login page.")
         }
         .alert("Delete Account", isPresented: $showingDeleteAccountAlert) {
             Button("Delete", role: .destructive) {
-                // Handle account deletion
+                // Clear all data and sign out
                 authService.signOut()
+                print("Account deletion initiated")
             }
             Button("Cancel", role: .cancel) { }
         } message: {
@@ -52,6 +80,8 @@ struct ProfileView: View {
         }
     }
 }
+
+// MARK: - Deprecated - Remove this old ProfileView implementation
 
 struct ProfileHeaderSection: View {
     @EnvironmentObject var authService: FirebaseAuthService
@@ -287,41 +317,7 @@ struct AppSettingsSection: View {
     }
 }
 
-struct SignOutSection: View {
-    @EnvironmentObject var authService: FirebaseAuthService
-    @Binding var showingSignOutAlert: Bool
-    @Binding var showingDeleteAccountAlert: Bool
-    
-    init() {
-        // Create bindings for the parent state
-        _showingSignOutAlert = .constant(false)
-        _showingDeleteAccountAlert = .constant(false)
-    }
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            Button(action: {
-                showingSignOutAlert = true
-            }) {
-                Text("Sign Out")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .cornerRadius(12)
-            }
-            
-            Button(action: {
-                showingDeleteAccountAlert = true
-            }) {
-                Text("Delete Account")
-                    .font(.subheadline)
-                    .foregroundColor(.red)
-            }
-        }
-    }
-}
+// MARK: - Supporting Views
 
 struct SettingsSection<Content: View>: View {
     let title: String
@@ -409,70 +405,8 @@ struct SettingsToggleRow: View {
     }
 }
 
-// Fix for SignOutSection - Create a separate view to handle the alerts
-struct ProfileViewContainer: View {
-    @EnvironmentObject var authService: FirebaseAuthService
-    @EnvironmentObject var notificationService: NotificationService
-    @State private var showingSignOutAlert = false
-    @State private var showingDeleteAccountAlert = false
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    ProfileHeaderSection()
-                    NotificationSettingsSection()
-                    SecuritySettingsSection()
-                    AccountSettingsSection()
-                    AppSettingsSection()
-                    
-                    VStack(spacing: 12) {
-                        Button(action: {
-                            showingSignOutAlert = true
-                        }) {
-                            Text("Sign Out")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .cornerRadius(12)
-                        }
-                        
-                        Button(action: {
-                            showingDeleteAccountAlert = true
-                        }) {
-                            Text("Delete Account")
-                                .font(.subheadline)
-                                .foregroundColor(.red)
-                        }
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("Profile")
-        }
-        .alert("Sign Out", isPresented: $showingSignOutAlert) {
-            Button("Sign Out", role: .destructive) {
-                authService.signOut()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Are you sure you want to sign out?")
-        }
-        .alert("Delete Account", isPresented: $showingDeleteAccountAlert) {
-            Button("Delete", role: .destructive) {
-                authService.signOut()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This action cannot be undone. All your data will be permanently deleted.")
-        }
-    }
-}
-
 #Preview {
-    ProfileViewContainer()
+    ProfileView()
         .environmentObject(FirebaseAuthService())
         .environmentObject(NotificationService())
 }

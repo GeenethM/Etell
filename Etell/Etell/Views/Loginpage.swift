@@ -8,17 +8,10 @@
 import SwiftUI
 
 struct LoginView: View {
-    @StateObject private var viewModel: AuthViewModel
     @EnvironmentObject var authService: FirebaseAuthService
     @EnvironmentObject var notificationService: NotificationService
     @State private var showingSignUp = false
-    
-    init() {
-        // Initialize with dependencies - this will be properly injected when view is created
-        let authService = FirebaseAuthService()
-        let notificationService = NotificationService()
-        _viewModel = StateObject(wrappedValue: AuthViewModel(authService: authService, notificationService: notificationService))
-    }
+    @StateObject private var viewModel = AuthViewModel(authService: FirebaseAuthService(), notificationService: NotificationService())
     
     var body: some View {
         ZStack {
@@ -88,12 +81,15 @@ struct LoginView: View {
                     HStack {
                         Spacer()
                         Button(action: {
-                            print("Forgot password tapped")
+                            Task {
+                                await viewModel.resetPassword()
+                            }
                         }) {
                             Text("Forgot password ?")
                                 .font(.system(size: 14))
                                 .foregroundColor(.blue)
                         }
+                        .disabled(viewModel.isLoading)
                     }
                     .padding(.top, 4)
                     
@@ -189,9 +185,8 @@ struct LoginView: View {
             SignUpView()
         }
         .onAppear {
-            // Reinitialize viewModel with proper environment objects
-            let newViewModel = AuthViewModel(authService: authService, notificationService: notificationService)
-            // Note: In a real app, you'd want to handle this dependency injection better
+            // Update viewModel to use environment objects
+            viewModel.updateServices(authService: authService, notificationService: notificationService)
         }
     }
 }
@@ -199,5 +194,7 @@ struct LoginView: View {
 struct LoginView_Previews: PreviewProvider {
     static var previews: some View {
         LoginView()
+            .environmentObject(FirebaseAuthService())
+            .environmentObject(NotificationService())
     }
 }

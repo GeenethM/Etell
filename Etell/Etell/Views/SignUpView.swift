@@ -8,17 +8,11 @@
 import SwiftUI
 
 struct SignUpView: View {
-    @StateObject private var viewModel: AuthViewModel
     @EnvironmentObject var authService: FirebaseAuthService
     @EnvironmentObject var notificationService: NotificationService
     @Environment(\.dismiss) var dismiss
     @State private var confirmPassword = ""
-    
-    init() {
-        let authService = FirebaseAuthService()
-        let notificationService = NotificationService()
-        _viewModel = StateObject(wrappedValue: AuthViewModel(authService: authService, notificationService: notificationService))
-    }
+    @StateObject private var viewModel = AuthViewModel(authService: FirebaseAuthService(), notificationService: NotificationService())
     
     var isFormValid: Bool {
         viewModel.isFormValid && confirmPassword == viewModel.password && viewModel.password.count >= 6
@@ -197,8 +191,8 @@ struct SignUpView: View {
             Text(viewModel.errorMessage)
         }
         .onAppear {
-            // Reinitialize viewModel with proper environment objects
-            let newViewModel = AuthViewModel(authService: authService, notificationService: notificationService)
+            // Update viewModel to use environment objects
+            viewModel.updateServices(authService: authService, notificationService: notificationService)
         }
     }
 }
