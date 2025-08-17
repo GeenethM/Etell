@@ -63,15 +63,45 @@ class NotificationService: ObservableObject {
     }
     
     func authenticateWithBiometrics() async -> Bool {
-        guard isFaceIDAvailable else { return false }
+        guard isFaceIDAvailable else { 
+            print("🔐 Biometrics not available")
+            return false 
+        }
+        
+        // Create a fresh context for each authentication attempt
+        let context = LAContext()
+        context.localizedFallbackTitle = "Use Password"
         
         do {
-            let result = try await authContext.evaluatePolicy(
+            let biometricType = context.biometryType == .faceID ? "Face ID" : "Touch ID"
+            print("🔐 Attempting \(biometricType) authentication")
+            
+            let result = try await context.evaluatePolicy(
                 .deviceOwnerAuthenticationWithBiometrics,
-                localizedReason: "Authenticate to access Etell"
+                localizedReason: "Use \(biometricType) to sign in to Etell"
             )
+            
+            print("🔐 Biometric authentication result: \(result)")
             return result
+        } catch let error as LAError {
+            print("🔐 Biometric authentication error: \(error.localizedDescription)")
+            
+            switch error.code {
+            case .biometryNotAvailable:
+                DispatchQueue.main.async {
+                    self.isFaceIDAvailable = false
+                }
+            case .userCancel, .userFallback:
+                // User cancelled or chose to use password
+                break
+            case .biometryLockout:
+                print("🔐 Biometry locked out - too many failed attempts")
+            default:
+                break
+            }
+            return false
         } catch {
+            print("🔐 Unexpected biometric error: \(error.localizedDescription)")
             return false
         }
     }

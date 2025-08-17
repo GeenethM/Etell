@@ -17,6 +17,7 @@ class AuthViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage = ""
     @Published var showError = false
+    @Published var enableFaceID = false
     
     private let authService: FirebaseAuthService
     private let notificationService: NotificationService
@@ -53,16 +54,20 @@ class AuthViewModel: ObservableObject {
         do {
             try await _authService.signIn(email: email, password: password)
             
-            // Check for Face ID authentication if enabled
-            if _notificationService.isFaceIDEnabled && _notificationService.isFaceIDAvailable {
-                let success = await _notificationService.authenticateWithBiometrics()
-                if !success {
-                    _authService.signOut()
-                    showErrorMessage("Biometric authentication failed")
-                    isLoading = false
-                    return
-                }
+            // Save Face ID preference and credentials if enabled
+            if enableFaceID {
+                _authService.updateUserSettings(
+                    faceIDEnabled: true,
+                    notificationsEnabled: _authService.currentUser?.notificationsEnabled ?? true
+                )
+                _authService.saveBiometricCredentials(email: email, password: password)
             }
+            
+            // Complete biometric authentication if required (e.g., app restart scenario)
+            if _authService.requiresBiometricAuth {
+                _authService.completeBiometricAuthentication()
+            }
+            
         } catch {
             showErrorMessage(friendlyErrorMessage(from: error))
         }
@@ -107,6 +112,62 @@ class AuthViewModel: ObservableObject {
     
     func signOut() {
         _authService.signOut()
+        resetLoginState()
+    }
+    
+    func resetLoginState() {
+        // Reset all login-related state when signing out
+        email = ""
+        password = ""
+        enableFaceID = false
+        isLoading = false
+        clearError()
+    }
+    
+    func signInWithBiometrics() async {
+        print("🔐 Starting biometric authentication")
+        
+        // Check if biometrics are available
+        guard _notificationService.isFaceIDAvailable else {
+            showErrorMessage("Biometric authentication is not available on this device.")
+            return
+        }
+        
+        // Check if we have saved credentials
+        guard _authService.hasBiometricCredentials() else {
+            showErrorMessage("No biometric credentials found. Please sign in with your password first and enable Face ID.")
+            return
+        }
+        
+        isLoading = true
+        
+        // Authenticate with biometrics
+        let biometricSuccess = await _notificationService.authenticateWithBiometrics()
+        
+        if biometricSuccess {
+            print("🔐 Biometric authentication successful - retrieving credentials")
+            
+            // Get stored credentials
+            if let credentials = _authService.getBiometricCredentials() {
+                do {
+                    // Sign in with stored credentials
+                    try await _authService.signIn(email: credentials.email, password: credentials.password)
+                    
+                    // Complete biometric authentication
+                    _authService.completeBiometricAuthentication()
+                    
+                    print("🔐 Successfully signed in with biometric authentication")
+                } catch {
+                    showErrorMessage("Failed to sign in with stored credentials: \(friendlyErrorMessage(from: error))")
+                }
+            } else {
+                showErrorMessage("Failed to retrieve stored credentials. Please sign in with your password.")
+            }
+        } else {
+            showErrorMessage("Biometric authentication failed. Please try again or sign in with your password.")
+        }
+        
+        isLoading = false
     }
     
     private func showErrorMessage(_ message: String) {

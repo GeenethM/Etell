@@ -8,22 +8,22 @@
 import SwiftUI
 
 struct AccessoriesStoreView: View {
+    @StateObject private var telecomAPI = TelecomAPIService()
     @State private var selectedCategory: Product.ProductCategory = .router
     @State private var searchText = ""
     @State private var showingCart = false
     @State private var cartItems: [Product] = []
     
-    let products = Product.mockProducts
-    
     var filteredProducts: [Product] {
-        let categoryFiltered = products.filter { $0.category == selectedCategory }
+        let categoryFiltered = telecomAPI.products.filter { $0.category == selectedCategory }
         
         if searchText.isEmpty {
             return categoryFiltered
         } else {
             return categoryFiltered.filter { product in
                 product.name.localizedCaseInsensitiveContains(searchText) ||
-                product.description.localizedCaseInsensitiveContains(searchText)
+                product.description.localizedCaseInsensitiveContains(searchText) ||
+                (product.brand?.localizedCaseInsensitiveContains(searchText) ?? false)
             }
         }
     }
@@ -37,8 +37,16 @@ struct AccessoriesStoreView: View {
                 // Category Selector
                 CategorySelector(selectedCategory: $selectedCategory)
                 
-                // Products Grid
-                if filteredProducts.isEmpty {
+                // Loading State
+                if telecomAPI.isLoading {
+                    LoadingView()
+                } else if let errorMessage = telecomAPI.errorMessage {
+                    ErrorView(message: errorMessage) {
+                        Task {
+                            await telecomAPI.fetchProductsByCategory(selectedCategory)
+                        }
+                    }
+                } else if filteredProducts.isEmpty {
                     EmptyStateView(category: selectedCategory, searchText: searchText)
                 } else {
                     ProductsGrid(products: filteredProducts, cartItems: $cartItems)
@@ -73,7 +81,72 @@ struct AccessoriesStoreView: View {
             .sheet(isPresented: $showingCart) {
                 CartView(items: $cartItems)
             }
+            .onAppear {
+                Task {
+                    await telecomAPI.fetchAllProducts()
+                }
+            }
+            .onChange(of: selectedCategory) { newCategory in
+                Task {
+                    await telecomAPI.fetchProductsByCategory(newCategory)
+                }
+            }
+            .refreshable {
+                Task {
+                    await telecomAPI.fetchProductsByCategory(selectedCategory)
+                }
+            }
         }
+    }
+}
+
+struct LoadingView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .scaleEffect(1.5)
+            
+            Text("Loading Products...")
+                .font(.headline)
+                .foregroundColor(.secondary)
+            
+            Text("Fetching latest telecom equipment from ASUS, NETGEAR, TP-Link, and Ubiquiti")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+    }
+}
+
+struct ErrorView: View {
+    let message: String
+    let onRetry: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 50))
+                .foregroundColor(.orange)
+            
+            Text("Failed to Load Products")
+                .font(.headline)
+            
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            Button("Try Again") {
+                onRetry()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
     }
 }
 
@@ -196,20 +269,62 @@ struct ProductCard: View {
             .cornerRadius(8)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(product.name)
-                    .font(.headline)
-                    .lineLimit(2)
+                // Brand and name
+                VStack(alignment: .leading, spacing: 2) {
+                    if let brand = product.brand {
+                        Text(brand)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Text(product.name)
+                        .font(.headline)
+                        .lineLimit(2)
+                }
+                
+                // Rating
+                if let rating = product.rating {
+                    HStack(spacing: 2) {
+                        ForEach(1...5, id: \.self) { star in
+                            Image(systemName: star <= Int(rating) ? "star.fill" : "star")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                        Text("(\(rating, specifier: "%.1f"))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
                 
                 Text(product.description)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .lineLimit(3)
+                    .lineLimit(2)
                 
+                // Price and stock info
                 HStack {
-                    Text("$\(product.price, specifier: "%.2f")")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(.blue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text("$\(product.price, specifier: "%.2f")")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                            
+                            if let originalPrice = product.originalPrice, originalPrice > product.price {
+                                Text("$\(originalPrice, specifier: "%.2f")")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .strikethrough()
+                            }
+                        }
+                        
+                        if let stockCount = product.stockCount, stockCount > 0 {
+                            Text("\(stockCount) in stock")
+                                .font(.caption2)
+                                .foregroundColor(.green)
+                        }
+                    }
                     
                     Spacer()
                     
@@ -272,6 +387,8 @@ struct ProductCard: View {
         case .mesh: return "network"
         case .cable: return "cable.connector"
         case .accessory: return "gear"
+        case .modem: return "externaldrive.connected.to.line.below"
+        case .antenna: return "dot.radiowaves.up.forward"
         }
     }
 }
@@ -330,27 +447,88 @@ struct ProductDetailSheet: View {
                     .cornerRadius(12)
                     
                     VStack(alignment: .leading, spacing: 12) {
+                        // Brand and Category
+                        HStack {
+                            if let brand = product.brand {
+                                Text(brand)
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            Spacer()
+                            
+                            Text(product.category.rawValue)
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(6)
+                        }
+                        
                         Text(product.name)
                             .font(.title)
                             .fontWeight(.bold)
                         
-                        Text(product.category.rawValue)
+                        // Rating
+                        if let rating = product.rating {
+                            HStack(spacing: 4) {
+                                ForEach(1...5, id: \.self) { star in
+                                    Image(systemName: star <= Int(rating) ? "star.fill" : "star")
+                                        .foregroundColor(.orange)
+                                }
+                                Text("(\(rating, specifier: "%.1f"))")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
                             .font(.subheadline)
-                            .foregroundColor(.blue)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 4)
-                            .background(Color.blue.opacity(0.1))
-                            .cornerRadius(6)
+                        }
                         
                         Text(product.description)
                             .font(.body)
                             .foregroundColor(.secondary)
                         
+                        // Tags
+                        if let tags = product.tags, !tags.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(tags, id: \.self) { tag in
+                                        Text(tag)
+                                            .font(.caption)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.gray.opacity(0.2))
+                                            .cornerRadius(4)
+                                    }
+                                }
+                                .padding(.horizontal, 1)
+                            }
+                        }
+                        
+                        // Price and Stock
                         HStack {
-                            Text("$\(product.price, specifier: "%.2f")")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 8) {
+                                    Text("$\(product.price, specifier: "%.2f")")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.blue)
+                                    
+                                    if let originalPrice = product.originalPrice, originalPrice > product.price {
+                                        Text("$\(originalPrice, specifier: "%.2f")")
+                                            .font(.body)
+                                            .foregroundColor(.secondary)
+                                            .strikethrough()
+                                    }
+                                }
+                                
+                                if let stockCount = product.stockCount, stockCount > 0 {
+                                    Text("\(stockCount) units available")
+                                        .font(.caption)
+                                        .foregroundColor(.green)
+                                }
+                            }
                             
                             Spacer()
                             
@@ -373,19 +551,35 @@ struct ProductDetailSheet: View {
                             }
                         }
                         
-                        // Mock specifications
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Specifications")
-                                .font(.headline)
-                            
-                            SpecificationRow(title: "Brand", value: "Etell")
-                            SpecificationRow(title: "Warranty", value: "2 years")
-                            SpecificationRow(title: "Compatibility", value: "Universal")
-                            
-                            if product.category == .router {
-                                SpecificationRow(title: "WiFi Standard", value: "WiFi 6 (802.11ax)")
-                                SpecificationRow(title: "Speed", value: "Up to 1200 Mbps")
-                                SpecificationRow(title: "Range", value: "Up to 3000 sq ft")
+                        // Specifications
+                        if let specifications = product.specifications, !specifications.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Specifications")
+                                    .font(.headline)
+                                
+                                ForEach(specifications.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                                    SpecificationRow(title: key, value: value)
+                                }
+                            }
+                        } else {
+                            // Mock specifications
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Specifications")
+                                    .font(.headline)
+                                
+                                if let brand = product.brand {
+                                    SpecificationRow(title: "Brand", value: brand)
+                                } else {
+                                    SpecificationRow(title: "Brand", value: "Etell")
+                                }
+                                SpecificationRow(title: "Warranty", value: "2 years")
+                                SpecificationRow(title: "Compatibility", value: "Universal")
+                                
+                                if product.category == .router {
+                                    SpecificationRow(title: "WiFi Standard", value: "WiFi 6 (802.11ax)")
+                                    SpecificationRow(title: "Speed", value: "Up to 1200 Mbps")
+                                    SpecificationRow(title: "Range", value: "Up to 3000 sq ft")
+                                }
                             }
                         }
                     }

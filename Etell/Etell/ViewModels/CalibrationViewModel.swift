@@ -15,6 +15,7 @@ class CalibrationViewModel: ObservableObject {
     @Published var isCalibrating = false
     @Published var calibrationResult: CalibrationResult?
     @Published var showingResult = false
+    @Published var userLocation: CLLocationCoordinate2D?
     @Published var mapRegion = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
@@ -35,6 +36,11 @@ class CalibrationViewModel: ObservableObject {
     
     init(signalService: SignalCalibrationService) {
         self.signalService = signalService
+        
+        // Update userLocation when it changes
+        signalService.$userLocation
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$userLocation)
         
         // Update map region when user location changes
         signalService.$userLocation
@@ -89,11 +95,26 @@ class CalibrationViewModel: ObservableObject {
         signalService.calibrations
     }
     
-    var userLocation: CLLocationCoordinate2D? {
-        signalService.userLocation
-    }
-    
     var currentHeading: Double {
         signalService.currentHeading
+    }
+    
+    func updateMapRegion(center: CLLocationCoordinate2D) {
+        mapRegion = MKCoordinateRegion(
+            center: center,
+            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        )
+    }
+    
+    func addTower(_ tower: Tower) {
+        signalService.addTower(tower)
+    }
+    
+    func removeTower(_ tower: Tower) {
+        signalService.removeTower(tower)
+    }
+    
+    func clearAllTowers() {
+        signalService.clearAllTowers()
     }
 }

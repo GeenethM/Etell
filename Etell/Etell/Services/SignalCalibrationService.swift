@@ -142,6 +142,19 @@ class SignalCalibrationService: NSObject, ObservableObject {
     func clearCalibrations() {
         calibrations.removeAll()
     }
+    
+    func addTower(_ tower: Tower) {
+        towers.append(tower)
+    }
+    
+    func removeTower(_ tower: Tower) {
+        towers.removeAll { $0.id == tower.id }
+    }
+    
+    func clearAllTowers() {
+        towers.removeAll()
+        generateMockTowers() // Regenerate default mock towers
+    }
 }
 
 // MARK: - CLLocationManagerDelegate

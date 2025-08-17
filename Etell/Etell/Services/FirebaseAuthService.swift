@@ -13,6 +13,7 @@ import FirebaseAuth
 class FirebaseAuthService: ObservableObject {
     @Published var currentUser: User?
     @Published var isAuthenticated = false
+    @Published var requiresBiometricAuth = false // New property for biometric lock
     
     private var cancellables = Set<AnyCancellable>()
     private var authStateHandle: AuthStateDidChangeListenerHandle?
@@ -43,13 +44,26 @@ class FirebaseAuthService: ObservableObject {
                         faceIDEnabled: false, // You can store this in Firestore
                         notificationsEnabled: true
                     )
-                    self?.isAuthenticated = true
+                    
+                    // Check if biometric credentials exist and require authentication
+                    if self?.hasBiometricCredentials() == true {
+                        print("🔵 Biometric credentials found - requiring biometric auth")
+                        self?.requiresBiometricAuth = true
+                        self?.isAuthenticated = false // Don't authenticate until biometric check passes
+                    } else {
+                        print("🔵 No biometric credentials - allowing direct access")
+                        self?.requiresBiometricAuth = false
+                        self?.isAuthenticated = true
+                    }
+                    
                     print("🔵 isAuthenticated set to: \(self?.isAuthenticated ?? false)")
+                    print("🔵 requiresBiometricAuth set to: \(self?.requiresBiometricAuth ?? false)")
                 } else {
                     // User is signed out
                     print("🔵 User signed out - clearing state")
                     self?.currentUser = nil
                     self?.isAuthenticated = false
+                    self?.requiresBiometricAuth = false
                     print("🔵 isAuthenticated set to: \(self?.isAuthenticated ?? false)")
                 }
             }
@@ -115,10 +129,44 @@ class FirebaseAuthService: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "cachedSpeedTestResults")
         UserDefaults.standard.removeObject(forKey: "userPreferences")
         
+        // Clear biometric credentials when signing out completely
+        UserDefaults.standard.removeObject(forKey: "biometricEmail")
+        UserDefaults.standard.removeObject(forKey: "biometricPassword")
+        
         // Clear any other app-specific data that should be removed on logout
         // Note: Don't clear hasSeenWelcome as that's a device-level setting
         
         print("User data cleared successfully")
+    }
+    
+    func completeBiometricAuthentication() {
+        print("🔵 Biometric authentication completed - granting access")
+        requiresBiometricAuth = false
+        isAuthenticated = true
+    }
+    
+    // MARK: - Biometric Authentication Support
+    
+    func saveBiometricCredentials(email: String, password: String) {
+        // In a production app, you should use Keychain for secure storage
+        // For demo purposes, we'll use UserDefaults with basic encoding
+        UserDefaults.standard.set(email, forKey: "biometricEmail")
+        UserDefaults.standard.set(password, forKey: "biometricPassword")
+        print("🔐 Biometric credentials saved for: \(email)")
+    }
+    
+    func getBiometricCredentials() -> (email: String, password: String)? {
+        guard let email = UserDefaults.standard.string(forKey: "biometricEmail"),
+              let password = UserDefaults.standard.string(forKey: "biometricPassword") else {
+            print("🔐 No biometric credentials found")
+            return nil
+        }
+        print("🔐 Retrieved biometric credentials for: \(email)")
+        return (email: email, password: password)
+    }
+    
+    func hasBiometricCredentials() -> Bool {
+        return getBiometricCredentials() != nil
     }
     
     func resetPassword(email: String) async throws {

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import LocalAuthentication
 
 struct LoginView: View {
     @EnvironmentObject var authService: FirebaseAuthService
@@ -93,29 +94,21 @@ struct LoginView: View {
                     }
                     .padding(.top, 4)
                     
-                    // Face ID Toggle
-                    if notificationService.isFaceIDAvailable {
+                    // Face ID Toggle - Show for devices with biometric capability and no saved credentials
+                    if notificationService.isFaceIDAvailable && !authService.hasBiometricCredentials() {
                         HStack {
                             Image(systemName: "info.circle")
                                 .foregroundColor(.gray)
                                 .font(.system(size: 16))
                             
-                            Text("Enable Face ID for future login")
+                            Text("Enable \(notificationService.biometryType == .faceID ? "Face ID" : "Touch ID") for future login")
                                 .font(.system(size: 16))
                                 .foregroundColor(.black)
                             
                             Spacer()
                             
-                            Toggle("", isOn: Binding(
-                                get: { authService.currentUser?.faceIDEnabled ?? false },
-                                set: { newValue in
-                                    authService.updateUserSettings(
-                                        faceIDEnabled: newValue,
-                                        notificationsEnabled: authService.currentUser?.notificationsEnabled ?? true
-                                    )
-                                }
-                            ))
-                            .labelsHidden()
+                            Toggle("", isOn: $viewModel.enableFaceID)
+                                .labelsHidden()
                         }
                         .padding(.top, 20)
                     }
@@ -147,6 +140,35 @@ struct LoginView: View {
                 .disabled(!viewModel.isFormValid || viewModel.isLoading)
                 .padding(.horizontal, 40)
                 .padding(.top, 30)
+                
+                // Face ID / Touch ID Button
+                if notificationService.isFaceIDAvailable && 
+                   authService.hasBiometricCredentials() && 
+                   !viewModel.isLoading {
+                    Button(action: {
+                        Task {
+                            await viewModel.signInWithBiometrics()
+                        }
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: notificationService.biometryType == .faceID ? "faceid" : "touchid")
+                                .font(.system(size: 20))
+                            
+                            Text("Sign in with \(notificationService.biometryType == .faceID ? "Face ID" : "Touch ID")")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.blue.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.blue, lineWidth: 1)
+                        )
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.top, 12)
+                }
                 
                 // Or text
                 Text("or")
@@ -187,6 +209,12 @@ struct LoginView: View {
         .onAppear {
             // Update viewModel to use environment objects
             viewModel.updateServices(authService: authService, notificationService: notificationService)
+        }
+        .onChange(of: authService.isAuthenticated) { isAuthenticated in
+            // Reset Face ID toggle when user signs out
+            if !isAuthenticated {
+                viewModel.resetLoginState()
+            }
         }
     }
 }

@@ -18,6 +18,10 @@ struct ContentView: View {
                 // First time user - show welcome screen
                 FrontPageView()
                     .onAppear { print("🟡 Showing FrontPageView") }
+            } else if authService.requiresBiometricAuth {
+                // User has Firebase auth but needs biometric authentication
+                BiometricLockView()
+                    .onAppear { print("🟡 Showing BiometricLockView - Biometric auth required") }
             } else if authService.isAuthenticated {
                 // Authenticated user - show main app
                 MainTabView()
@@ -29,7 +33,7 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            print("🟡 ContentView appeared - hasSeenWelcome: \(hasSeenWelcome), isAuthenticated: \(authService.isAuthenticated)")
+            print("🟡 ContentView appeared - hasSeenWelcome: \(hasSeenWelcome), isAuthenticated: \(authService.isAuthenticated), requiresBiometricAuth: \(authService.requiresBiometricAuth)")
             // Initialize notification service
             if notificationService.isAuthorized {
                 notificationService.requestNotificationPermission()
@@ -37,6 +41,9 @@ struct ContentView: View {
         }
         .onChange(of: authService.isAuthenticated) { newValue in
             print("🟡 Authentication state changed to: \(newValue)")
+        }
+        .onChange(of: authService.requiresBiometricAuth) { newValue in
+            print("🟡 Biometric auth requirement changed to: \(newValue)")
         }
     }
 }

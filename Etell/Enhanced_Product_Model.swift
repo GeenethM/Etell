@@ -1,13 +1,7 @@
-//
-//  Product.swift
-//  Etell
-//
-//  Created by Geeneth 013 on 2025-08-16.
-//
-
+// Enhanced Product Model with more realistic data
 import Foundation
 
-struct Product: Codable, Identifiable, Hashable {
+struct Product: Codable, Identifiable {
     let id: String
     let name: String
     let description: String
@@ -16,25 +10,16 @@ struct Product: Codable, Identifiable, Hashable {
     let imageURL: String
     let category: ProductCategory
     let inStock: Bool
-    let stockCount: Int?
-    let rating: Double?
+    let stockCount: Int
+    let rating: Double
     let reviewCount: Int
-    let specifications: [String: String]?
-    let brand: String?
-    let tags: [String]?
-    
-    // Hashable conformance
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-    
-    static func == (lhs: Product, rhs: Product) -> Bool {
-        return lhs.id == rhs.id
-    }
+    let specifications: [String: String]
+    let brand: String
+    let tags: [String]
     
     enum ProductCategory: String, CaseIterable, Codable {
         case router = "Router"
-        case extender = "Extender"
+        case extender = "Extender" 
         case mesh = "Mesh System"
         case cable = "Cable"
         case accessory = "Accessory"
@@ -124,9 +109,77 @@ struct Product: Codable, Identifiable, Hashable {
             ],
             brand: "eero",
             tags: ["mesh", "wifi6e", "smart-home", "easy-setup"]
+        ),
+        
+        // Range Extenders
+        Product(
+            id: "tplink_re650",
+            name: "TP-Link AC2600 WiFi Extender",
+            description: "Powerful AC2600 dual-band WiFi extender with OneMesh compatibility. Extends WiFi coverage up to 14,000 sq ft.",
+            price: 79.99,
+            originalPrice: 99.99,
+            imageURL: "https://m.media-amazon.com/images/I/51VXnI-k2xL._AC_SL1000_.jpg",
+            category: .extender,
+            inStock: true,
+            stockCount: 12,
+            rating: 4.2,
+            reviewCount: 203,
+            specifications: [
+                "WiFi Standard": "AC2600 dual-band",
+                "Speed": "800 Mbps (2.4GHz) + 1733 Mbps (5GHz)",
+                "Coverage": "Up to 14,000 sq ft",
+                "Ports": "1x Gigabit Ethernet",
+                "Antennas": "4 external antennas"
+            ],
+            brand: "TP-Link",
+            tags: ["extender", "onemesh", "dual-band", "gigabit"]
+        ),
+        
+        // Cables & Accessories
+        Product(
+            id: "cat8_cable_25ft",
+            name: "Cat 8 Ethernet Cable 25ft",
+            description: "High-speed Cat 8 ethernet cable supporting up to 40Gbps. Perfect for gaming, streaming, and professional applications.",
+            price: 24.99,
+            originalPrice: nil,
+            imageURL: "https://m.media-amazon.com/images/I/61TK8YfWbFL._AC_SL1500_.jpg",
+            category: .cable,
+            inStock: true,
+            stockCount: 25,
+            rating: 4.8,
+            reviewCount: 67,
+            specifications: [
+                "Category": "Cat 8",
+                "Speed": "Up to 40 Gbps",
+                "Length": "25 feet",
+                "Connector": "RJ45",
+                "Shielding": "S/FTP"
+            ],
+            brand: "DbillionDa",
+            tags: ["cat8", "high-speed", "gaming", "professional"]
+        ),
+        
+        Product(
+            id: "wall_mount_bracket",
+            name: "Universal Router Wall Mount",
+            description: "Adjustable wall mount bracket for routers and modems. Saves space and improves ventilation with cable management.",
+            price: 15.99,
+            originalPrice: nil,
+            imageURL: "https://m.media-amazon.com/images/I/71yQXJd5jkL._AC_SL1500_.jpg",
+            category: .accessory,
+            inStock: true,
+            stockCount: 18,
+            rating: 4.4,
+            reviewCount: 142,
+            specifications: [
+                "Material": "Heavy-duty steel",
+                "Weight Capacity": "Up to 8 lbs",
+                "Mounting": "Wall-mounted",
+                "Compatibility": "Universal",
+                "Cable Management": "Built-in clips"
+            ],
+            brand: "HumanCentric",
+            tags: ["mount", "organization", "space-saving", "universal"]
         )
     ]
-    
-    // Legacy support for existing mockProducts
-    static let mockProducts: [Product] = realisticMockProducts
 }

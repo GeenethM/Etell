@@ -21,18 +21,25 @@ struct CalibrationView: View {
             VStack(spacing: 0) {
                 // Map View
                 MapView()
+                    .environmentObject(viewModel)
                     .frame(height: 250)
                 
                 // Controls and Information
                 ScrollView {
                     VStack(spacing: 20) {
                         CalibrationInstructions()
+                        TowerManagementSection()
+                            .environmentObject(viewModel)
                         RoomSelector()
+                            .environmentObject(viewModel)
                         CalibrationButton()
+                            .environmentObject(viewModel)
                         
                         if viewModel.hasCalibrations {
                             CalibrationsList()
+                                .environmentObject(viewModel)
                             ResultsSection()
+                                .environmentObject(viewModel)
                         }
                     }
                     .padding()
@@ -53,34 +60,185 @@ struct CalibrationView: View {
 
 struct MapView: View {
     @EnvironmentObject var viewModel: CalibrationViewModel
+    @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var showingAddTowerSheet = false
+    @State private var selectedCoordinate: CLLocationCoordinate2D?
     
     var body: some View {
-        Map(coordinateRegion: $viewModel.mapRegion, annotationItems: viewModel.towers) { tower in
-            MapAnnotation(coordinate: tower.coordinate) {
-                VStack {
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .foregroundColor(.red)
-                        .font(.title2)
-                    Text(tower.name)
-                        .font(.caption)
-                        .padding(.horizontal, 4)
-                        .background(Color.white.opacity(0.8))
-                        .cornerRadius(4)
+        VStack(spacing: 0) {
+            // Map Controls Header
+            HStack {
+                Text("Long press: add • Tap tower: remove")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Button("Reset Towers") {
+                    viewModel.clearAllTowers()
+                }
+                .font(.caption)
+                .foregroundColor(.blue)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(Color(.systemGray6))
+            
+            Map(position: $cameraPosition) {
+                // User location marker
+                if let userLocation = viewModel.userLocation {
+                    Annotation("Your Location", coordinate: userLocation) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.blue)
+                                .frame(width: 20, height: 20)
+                            Circle()
+                                .stroke(Color.white, lineWidth: 3)
+                                .frame(width: 20, height: 20)
+                            Circle()
+                                .stroke(Color.blue, lineWidth: 1)
+                                .frame(width: 40, height: 40)
+                                .opacity(0.3)
+                        }
+                    }
+                    .annotationTitles(.hidden)
+                }
+                
+                // Cell towers
+                ForEach(viewModel.towers) { tower in
+                    Annotation(tower.name, coordinate: tower.coordinate) {
+                        Button(action: {
+                            viewModel.removeTower(tower)
+                        }) {
+                            VStack(spacing: 4) {
+                                ZStack {
+                                    Circle()
+                                        .fill(signalStrengthColor(tower.signalStrength).opacity(0.2))
+                                        .frame(width: 32, height: 32)
+                                    Image(systemName: "antenna.radiowaves.left.and.right")
+                                        .foregroundColor(signalStrengthColor(tower.signalStrength))
+                                        .font(.system(size: 16, weight: .semibold))
+                                }
+                                Text(tower.name)
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.white.opacity(0.9))
+                                    .cornerRadius(4)
+                                    .shadow(radius: 2)
+                                Text("\(Int(tower.signalStrength * 100))%")
+                                    .font(.caption2)
+                                    .foregroundColor(signalStrengthColor(tower.signalStrength))
+                                    .fontWeight(.bold)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .annotationTitles(.hidden)
+                }
+            }
+            .mapStyle(.standard(elevation: .flat))
+            .mapControls {
+                MapUserLocationButton()
+                MapCompass()
+                MapScaleView()
+            }
+            .onMapCameraChange { context in
+                // Handle camera changes if needed
+            }
+            .gesture(
+                LongPressGesture(minimumDuration: 0.5)
+                    .onEnded { _ in
+                        handleMapLongPress()
+                    }
+            )
+            .onAppear {
+                updateCameraPosition()
+            }
+            .onReceive(viewModel.$userLocation) { newLocation in
+                updateCameraPosition()
+            }
+        }
+        .sheet(isPresented: $showingAddTowerSheet) {
+            if let coordinate = selectedCoordinate {
+                AddTowerView(coordinate: coordinate) { tower in
+                    viewModel.addTower(tower)
+                    showingAddTowerSheet = false
                 }
             }
         }
-        .overlay(
-            // User location indicator
-            Circle()
-                .fill(Color.blue)
-                .frame(width: 16, height: 16)
-                .overlay(
-                    Circle()
-                        .stroke(Color.white, lineWidth: 2)
-                )
-                .opacity(viewModel.userLocation != nil ? 1 : 0),
-            alignment: .center
-        )
+    }
+    
+    private func signalStrengthColor(_ strength: Double) -> Color {
+        switch strength {
+        case 0.8...1.0: return .green
+        case 0.6..<0.8: return .blue
+        case 0.4..<0.6: return .orange
+        default: return .red
+        }
+    }
+    
+    private func handleMapLongPress() {
+        // Generate a coordinate near the user's location for the new tower
+        if let userLocation = viewModel.userLocation {
+            let randomOffset = 0.002 // Small random offset from user location
+            let latitude = userLocation.latitude + Double.random(in: -randomOffset...randomOffset)
+            let longitude = userLocation.longitude + Double.random(in: -randomOffset...randomOffset)
+            
+            selectedCoordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            showingAddTowerSheet = true
+        } else {
+            // Fallback to San Francisco if no user location
+            let latitude = 37.7749 + Double.random(in: -0.002...0.002)
+            let longitude = -122.4194 + Double.random(in: -0.002...0.002)
+            
+            selectedCoordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            showingAddTowerSheet = true
+        }
+    }
+    
+    private func updateCameraPosition() {
+        if let userLocation = viewModel.userLocation {
+            withAnimation(.easeInOut(duration: 1.0)) {
+                cameraPosition = .region(MKCoordinateRegion(
+                    center: userLocation,
+                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                ))
+            }
+        }
+    }
+}
+
+struct TowerManagementSection: View {
+    @EnvironmentObject var viewModel: CalibrationViewModel
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Cell Towers")
+                    .font(.headline)
+                Spacer()
+                Text("\(viewModel.towers.count) towers")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("• Long press map to add new towers")
+                    Text("• Tap existing towers to remove them")
+                    Text("• Different colors show signal quality")
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+                
+                Spacer()
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
     }
 }
 
@@ -475,6 +633,117 @@ struct ProductDetailView: View {
         .padding()
         .navigationTitle(product.name)
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct AddTowerView: View {
+    let coordinate: CLLocationCoordinate2D
+    let onAdd: (Tower) -> Void
+    
+    @State private var towerName = ""
+    @State private var signalStrength: Double = 0.8
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Tower Details")) {
+                    HStack {
+                        Text("Name:")
+                        TextField("Enter tower name", text: $towerName)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Signal Strength:")
+                            Spacer()
+                            Text("\(Int(signalStrength * 100))%")
+                                .foregroundColor(signalStrengthColor)
+                                .fontWeight(.bold)
+                        }
+                        
+                        Slider(value: $signalStrength, in: 0.1...1.0, step: 0.1)
+                            .accentColor(signalStrengthColor)
+                    }
+                }
+                
+                Section(header: Text("Location")) {
+                    HStack {
+                        Text("Latitude:")
+                        Spacer()
+                        Text("\(coordinate.latitude, specifier: "%.6f")")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Longitude:")
+                        Spacer()
+                        Text("\(coordinate.longitude, specifier: "%.6f")")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section(header: Text("Preview")) {
+                    HStack {
+                        ZStack {
+                            Circle()
+                                .fill(signalStrengthColor.opacity(0.2))
+                                .frame(width: 40, height: 40)
+                            Image(systemName: "antenna.radiowaves.left.and.right")
+                                .foregroundColor(signalStrengthColor)
+                                .font(.system(size: 20, weight: .semibold))
+                        }
+                        
+                        VStack(alignment: .leading) {
+                            Text(towerName.isEmpty ? "New Tower" : towerName)
+                                .fontWeight(.medium)
+                            Text("Signal: \(Int(signalStrength * 100))%")
+                                .font(.caption)
+                                .foregroundColor(signalStrengthColor)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle("Add Tower")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Add") {
+                        let tower = Tower(
+                            name: towerName.isEmpty ? "Tower \(Int.random(in: 1000...9999))" : towerName,
+                            coordinate: coordinate,
+                            signalStrength: signalStrength
+                        )
+                        onAdd(tower)
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(false) // Always enabled since we have a fallback name
+                }
+            }
+        }
+        .onAppear {
+            // Generate a default name
+            if towerName.isEmpty {
+                towerName = "Tower \(Int.random(in: 100...999))"
+            }
+        }
+    }
+    
+    private var signalStrengthColor: Color {
+        switch signalStrength {
+        case 0.8...1.0: return .green
+        case 0.6..<0.8: return .blue
+        case 0.4..<0.6: return .orange
+        default: return .red
+        }
     }
 }
 
