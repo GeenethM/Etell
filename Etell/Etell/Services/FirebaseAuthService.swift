@@ -19,6 +19,8 @@ class FirebaseAuthService: ObservableObject {
     private var authStateHandle: AuthStateDidChangeListenerHandle?
     
     init() {
+        // For debugging: Clear any existing auth state
+        try? Auth.auth().signOut()
         setupAuthStateListener()
     }
     

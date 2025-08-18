@@ -14,225 +14,248 @@ struct DashboardView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Connection Status Card
-                    ConnectionStatusCard()
+                    // Welcome Header
+                    WelcomeHeader()
                     
-                    // Data Usage Card
-                    DataUsageCard()
+                    // AR Calibration Card
+                    ARCalibrationCard()
                     
-                    // Quick Actions
-                    QuickActionsGrid()
+                    // Signal Map Card
+                    SignalMapCard()
                     
-                    // Recent Activity
-                    RecentActivitySection()
+                    // Data Plan Card
+                    DataPlanCard()
+                    
+                    // Quick Action Buttons
+                    QuickActionButtons()
+                    
+                    Spacer(minLength: 100) // Space for tab bar
                 }
-                .padding()
+                .padding(.horizontal)
             }
-            .navigationTitle("Dashboard")
-            .refreshable {
-                viewModel.refreshData()
-            }
+            .navigationBarHidden(true)
         }
     }
 }
 
-struct ConnectionStatusCard: View {
-    @EnvironmentObject var viewModel: DashboardViewModel
-    
+struct WelcomeHeader: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Connection Status")
-                    .font(.headline)
-                Spacer()
-                Circle()
-                    .fill(Color(viewModel.connectionStatus.color))
-                    .frame(width: 12, height: 12)
-            }
-            
-            Text(viewModel.connectionStatus.displayText)
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Text("Current Speed: \(viewModel.currentSpeed)")
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-    }
-}
-
-struct DataUsageCard: View {
-    @EnvironmentObject var viewModel: DashboardViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Data Usage")
-                .font(.headline)
-            
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 VStack(alignment: .leading) {
-                    Text("\(viewModel.currentDataUsage, specifier: "%.1f") GB")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    Text("of \(viewModel.dataLimit, specifier: "%.0f") GB")
-                        .foregroundColor(.secondary)
+                    Text("Hi Geeneth")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
+                    
+                    Text("Welcome back to E-tell")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
                 }
-                
                 Spacer()
-                
-                CircularProgressView(
-                    progress: viewModel.dataUsagePercentage,
-                    color: Color(viewModel.dataUsageColor)
-                )
-                .frame(width: 60, height: 60)
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .padding(.top)
     }
 }
 
-struct CircularProgressView: View {
-    let progress: Double
-    let color: Color
-    
+struct ARCalibrationCard: View {
     var body: some View {
-        ZStack {
-            Circle()
-                .stroke(color.opacity(0.3), lineWidth: 6)
-            
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            
-            Text("\(Int(progress * 100))%")
-                .font(.caption)
-                .fontWeight(.semibold)
-        }
-    }
-}
-
-struct QuickActionsGrid: View {
-    let actions = [
-        ("Speed Test", "speedometer", Color.blue),
-        ("Signal Check", "wifi", Color.green),
-        ("Data Plans", "chart.bar", Color.orange),
-        ("Support", "questionmark.circle", Color.purple)
-    ]
-    
-    var body: some View {
-        VStack(alignment: .leading) {
-            Text("Quick Actions")
-                .font(.headline)
-                .padding(.bottom, 8)
-            
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
-                ForEach(actions, id: \.0) { action in
-                    QuickActionCard(title: action.0, icon: action.1, color: action.2)
-                }
-            }
-        }
-    }
-}
-
-struct QuickActionCard: View {
-    let title: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        Button(action: {
-            // Navigation handled by TabView
-        }) {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
+        NavigationLink(destination: CalibrationView()) {
+            VStack(spacing: 12) {
+                Image(systemName: "camera.metering.center.weighted")
+                    .font(.system(size: 40))
+                    .foregroundColor(.white)
                 
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.primary)
+                Text("Launch Calibration")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                
+                Text("Optimize your router position")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.9))
             }
             .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+            .padding(.vertical, 30)
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .cornerRadius(16)
         }
         .buttonStyle(PlainButtonStyle())
     }
 }
 
-struct RecentActivitySection: View {
+struct SignalMapCard: View {
+    var body: some View {
+        NavigationLink(destination: CalibrationView()) {
+            VStack(spacing: 12) {
+                Image(systemName: "map")
+                    .font(.system(size: 30))
+                    .foregroundColor(.blue)
+                
+                Text("Open Signal Map")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.blue)
+                
+                Text("View nearby signal towers")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+            .background(Color.white)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+            )
+            .cornerRadius(16)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct DataPlanCard: View {
     @EnvironmentObject var viewModel: DashboardViewModel
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Activity")
-                .font(.headline)
+        NavigationLink(destination: DataPlanView()) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Your Plan")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        
+                        Text("Home 100GB")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.black)
+                    }
+                    
+                    Spacer()
+                    
+                    Text("Active")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.green)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(8)
+                }
+                
+                // Progress Bar
+                VStack(alignment: .leading, spacing: 8) {
+                    ProgressView(value: 0.65) // 65GB used out of 100GB
+                        .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                        .scaleEffect(x: 1, y: 2, anchor: .center)
+                    
+                    HStack {
+                        Text("65GB used")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        
+                        Spacer()
+                        
+                        Text("35GB left")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                }
+                
+                HStack {
+                    Image(systemName: "calendar")
+                        .foregroundColor(.gray)
+                        .font(.caption)
+                    
+                    Text("Expires in 10 days")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+            .padding()
+            .background(Color.white)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+            )
+            .cornerRadius(16)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct QuickActionButtons: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            // First row
+            HStack(spacing: 16) {
+                QuickActionButton(
+                    icon: "wifi",
+                    title: "Speed Test",
+                    destination: AnyView(SpeedTestView())
+                )
+                
+                QuickActionButton(
+                    icon: "gearshape",
+                    title: "Settings",
+                    destination: AnyView(ProfileView())
+                )
+            }
             
-            ForEach(viewModel.recentActivities.prefix(3)) { activity in
-                ActivityRow(activity: activity)
+            // Second row
+            HStack(spacing: 16) {
+                QuickActionButton(
+                    icon: "headphones",
+                    title: "Support",
+                    destination: AnyView(CustomerSupportView())
+                )
+                
+                QuickActionButton(
+                    icon: "bag",
+                    title: "Accessories",
+                    destination: AnyView(AccessoriesStoreView())
+                )
             }
         }
     }
 }
 
-struct ActivityRow: View {
-    let activity: DashboardViewModel.Activity
+struct QuickActionButton: View {
+    let icon: String
+    let title: String
+    let destination: AnyView
     
     var body: some View {
-        HStack {
-            Image(systemName: iconForActivityType(activity.type))
-                .foregroundColor(.blue)
-                .frame(width: 24)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(activity.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+        NavigationLink(destination: destination) {
+            VStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(.blue)
                 
-                Text(activity.description)
+                Text(title)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.gray)
             }
-            
-            Spacer()
-            
-            Text(timeAgoString(from: activity.timestamp))
-                .font(.caption)
-                .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 20)
+            .background(Color.white)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+            )
+            .cornerRadius(12)
         }
-        .padding(.vertical, 4)
-    }
-    
-    private func iconForActivityType(_ type: DashboardViewModel.Activity.ActivityType) -> String {
-        switch type {
-        case .speedTest: return "speedometer"
-        case .planChange: return "chart.bar"
-        case .deviceConnected: return "iphone"
-        case .calibration: return "wifi"
-        }
-    }
-    
-    private func timeAgoString(from date: Date) -> String {
-        let interval = Date().timeIntervalSince(date)
-        let hours = Int(interval / 3600)
-        let days = hours / 24
-        
-        if days > 0 {
-            return "\(days)d ago"
-        } else if hours > 0 {
-            return "\(hours)h ago"
-        } else {
-            return "Now"
-        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
-
 #Preview {
     DashboardView()
         .environmentObject(DashboardViewModel())

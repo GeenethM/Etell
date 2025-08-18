@@ -10,211 +10,180 @@ import SwiftUI
 struct DataPlanView: View {
     @State private var selectedPlan: DataPlan?
     @State private var showingPlanDetails = false
+    @Environment(\.dismiss) private var dismiss
     
-    let plans = DataPlan.mockPlans
+    let plans = [
+        DataPlan(id: "1", name: "Home 100GB", provider: "Etell", speed: "50 Mbps", dataLimit: "100 GB", price: 1499, features: ["Free router included", "24/7 customer support", "Unlimited night browsing"], isPopular: false),
+        DataPlan(id: "2", name: "Basic", provider: "Etell", speed: "25 Mbps", dataLimit: "40 GB", price: 499, features: ["No contract", "Email support"], isPopular: false),
+        DataPlan(id: "3", name: "Premium", provider: "Etell", speed: "100 Mbps", dataLimit: "200 GB", price: 2499, features: ["Free router included", "24/7 priority support", "Unlimited night browsing", "Free static IP address"], isPopular: true)
+    ]
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Header
-                    PlanSelectionHeader()
+                    // Filter and Sort Header
+                    FilterSortHeader()
                     
-                    // Plans Grid
+                    // Plan Cards
                     ForEach(plans) { plan in
-                        PlanCard(plan: plan, isSelected: selectedPlan?.id == plan.id) {
+                        PlanCard(plan: plan, isCurrentPlan: plan.id == "1") {
                             selectedPlan = plan
                             showingPlanDetails = true
                         }
                     }
                     
-                    // Current Plan Status
-                    CurrentPlanStatus()
+                    Spacer(minLength: 100) // Space for tab bar
                 }
-                .padding()
+                .padding(.horizontal)
+                .padding(.top, 10)
             }
-            .navigationTitle("Data Plans")
-            .sheet(isPresented: $showingPlanDetails) {
-                if let plan = selectedPlan {
-                    PlanDetailView(plan: plan)
+            .navigationTitle("Select a Plan")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Back") {
+                        dismiss()
+                    }
+                    .foregroundColor(.blue)
                 }
             }
         }
     }
 }
 
-struct PlanSelectionHeader: View {
+struct FilterSortHeader: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Choose Your Perfect Plan")
-                .font(.title2)
-                .fontWeight(.bold)
+        HStack {
+            HStack(spacing: 16) {
+                Button(action: {}) {
+                    HStack(spacing: 4) {
+                        Text("Filter")
+                            .font(.subheadline)
+                            .foregroundColor(.black)
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.black)
+                    }
+                }
+                
+                Button(action: {}) {
+                    HStack(spacing: 4) {
+                        Text("Sort")
+                            .font(.subheadline)
+                            .foregroundColor(.black)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.black)
+                    }
+                }
+            }
             
-            Text("Select a data plan that fits your needs. All plans include unlimited calling and flexible terms.")
+            Spacer()
+            
+            Text("3 plans available")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(.blue)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 struct PlanCard: View {
     let plan: DataPlan
-    let isSelected: Bool
+    let isCurrentPlan: Bool
     let onTap: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 16) {
-                // Header with Popular Badge
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(plan.name)
-                            .font(.title3)
-                            .fontWeight(.bold)
-                        Text(plan.provider)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    if plan.isPopular {
-                        Text("POPULAR")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.orange)
-                            .foregroundColor(.white)
-                            .cornerRadius(4)
-                    }
-                }
-                
-                // Speed and Data
-                HStack {
-                    InfoItem(title: "Speed", value: plan.speed, icon: "speedometer")
-                    Spacer()
-                    InfoItem(title: "Data", value: plan.dataLimit, icon: "chart.bar.fill")
-                }
-                
-                // Features
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with plan name, price and active badge
+            HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Features:")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
+                    Text(plan.name)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
                     
-                    ForEach(plan.features, id: \.self) { feature in
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .font(.caption)
-                            Text(feature)
-                                .font(.caption)
-                        }
+                    HStack(spacing: 4) {
+                        Image(systemName: "wifi")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        Text("\(plan.speed) / \(plan.dataLimit)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
                     }
                 }
                 
-                // Price
-                HStack {
-                    Text("$\(plan.price, specifier: "%.2f")")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                    Text("/month")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    if isCurrentPlan {
+                        Text("Active")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 4)
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                    }
                     
-                    Spacer()
-                    
-                    Text("Select Plan")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.blue)
-                }
-            }
-            .padding()
-            .background(Color(.systemGray6))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(plan.isPopular ? Color.orange : Color.clear, lineWidth: 2)
-            )
-            .cornerRadius(12)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-struct InfoItem: View {
-    let title: String
-    let value: String
-    let icon: String
-    
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundColor(.blue)
-            VStack(alignment: .leading) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(value)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-            }
-        }
-    }
-}
-
-struct CurrentPlanStatus: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Current Plan")
-                .font(.headline)
-            
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Premium Plan")
+                    Text("LKR \(Int(plan.price))")
                         .font(.title3)
-                        .fontWeight(.semibold)
-                    Text("100 Mbps • 500 GB")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing) {
-                    Text("$59.99/mo")
-                        .font(.headline)
                         .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                    Text("Renews Jan 15")
+                        .foregroundColor(.black)
+                    
+                    Text("per month")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.gray)
                 }
             }
             
-            HStack {
-                Button("Modify Plan") {
-                    // Handle plan modification
+            // Features with checkmarks
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(plan.features, id: \.self) { feature in
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        Text(feature)
+                            .font(.subheadline)
+                            .foregroundColor(.black)
+                        Spacer()
+                    }
                 }
-                .font(.subheadline)
-                .foregroundColor(.blue)
-                
-                Spacer()
-                
-                Button("Cancel Plan") {
-                    // Handle plan cancellation
+            }
+            
+            // Currently Active banner or Subscribe button
+            if isCurrentPlan {
+                Text("Currently Active")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(8)
+            } else {
+                Button(action: onTap) {
+                    Text("Subscribe")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.blue)
+                        .cornerRadius(8)
                 }
-                .font(.subheadline)
-                .foregroundColor(.red)
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.white)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isCurrentPlan ? Color.blue : Color.gray.opacity(0.2), lineWidth: isCurrentPlan ? 2 : 1)
+        )
         .cornerRadius(12)
+        .shadow(color: .gray.opacity(0.1), radius: 2, x: 0, y: 1)
     }
 }
 
@@ -240,7 +209,7 @@ struct PlanDetailView: View {
                     Button(action: {
                         showingConfirmation = true
                     }) {
-                        Text("Select This Plan")
+                        Text("Subscribe to This Plan")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -267,7 +236,7 @@ struct PlanDetailView: View {
                 }
                 Button("Cancel", role: .cancel) { }
             } message: {
-                Text("Are you sure you want to select the \(plan.name) for $\(plan.price, specifier: "%.2f")/month?")
+                Text("Are you sure you want to subscribe to the \(plan.name) for LKR \(Int(plan.price))/month?")
             }
         }
     }
@@ -322,7 +291,7 @@ struct PlanOverviewSection: View {
                 }
                 
                 VStack {
-                    Text("$\(plan.price, specifier: "%.0f")")
+                    Text("LKR \(Int(plan.price))")
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.blue)
@@ -374,12 +343,12 @@ struct PlanFeaturesSection: View {
     
     private var additionalFeatures: [String] {
         switch plan.name {
-        case "Basic Plan":
+        case "Basic":
             return ["WiFi hotspot access", "Email support", "Basic security"]
-        case "Premium Plan":
+        case "Premium":
             return ["WiFi hotspot access", "Phone & email support", "Advanced security", "Parental controls"]
-        case "Ultimate Plan":
-            return ["Unlimited WiFi hotspot", "24/7 phone support", "Premium security suite", "Advanced parental controls", "Static IP address"]
+        case "Home 100GB":
+            return ["Unlimited WiFi hotspot", "24/7 phone support", "Premium security suite", "Advanced parental controls"]
         default:
             return []
         }
