@@ -60,8 +60,12 @@ struct WelcomeHeader: View {
 }
 
 struct ARCalibrationCard: View {
+    @State private var showingSetupFlow = false
+    
     var body: some View {
-        NavigationLink(destination: CalibrationView()) {
+        Button(action: {
+            showingSetupFlow = true
+        }) {
             VStack(spacing: 12) {
                 Image(systemName: "camera.metering.center.weighted")
                     .font(.system(size: 40))
@@ -88,12 +92,15 @@ struct ARCalibrationCard: View {
             .cornerRadius(16)
         }
         .buttonStyle(PlainButtonStyle())
+        .sheet(isPresented: $showingSetupFlow) {
+            CalibrationSetupFlow()
+        }
     }
 }
 
 struct SignalMapCard: View {
     var body: some View {
-        NavigationLink(destination: CalibrationView()) {
+        NavigationLink(destination: SignalMapView()) {
             VStack(spacing: 12) {
                 Image(systemName: "map")
                     .font(.system(size: 30))

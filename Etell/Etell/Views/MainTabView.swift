@@ -9,15 +9,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @StateObject private var dashboardViewModel = DashboardViewModel()
-    @StateObject private var signalService = SignalCalibrationService()
-    @StateObject private var calibrationViewModel: CalibrationViewModel
     @EnvironmentObject var authService: FirebaseAuthService
-    
-    init() {
-        let service = SignalCalibrationService()
-        self._signalService = StateObject(wrappedValue: service)
-        self._calibrationViewModel = StateObject(wrappedValue: CalibrationViewModel(signalService: service))
-    }
     
     var body: some View {
         TabView {
@@ -28,18 +20,16 @@ struct MainTabView: View {
                     Text("Home")
                 }
             
-            CalibrationView()
-                .environmentObject(calibrationViewModel)
+            SignalMapView()
                 .tabItem {
                     Image(systemName: "map")
                     Text("Map")
                 }
             
-            CalibrationView()
-                .environmentObject(calibrationViewModel)
+            AccessoriesStoreView()
                 .tabItem {
-                    Image(systemName: "camera.metering.center.weighted")
-                    Text("Calibration")
+                    Image(systemName: "bag.fill")
+                    Text("Store")
                 }
             
             ProfileView()

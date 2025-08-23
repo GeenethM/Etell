@@ -28,6 +28,7 @@ struct CalibrationView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         CalibrationInstructions()
+                        EnvironmentSetupSection()
                         TowerManagementSection()
                             .environmentObject(viewModel)
                         RoomSelector()
@@ -743,6 +744,84 @@ struct AddTowerView: View {
         case 0.6..<0.8: return .blue
         case 0.4..<0.6: return .orange
         default: return .red
+        }
+    }
+}
+
+// MARK: - Environment Setup Section
+struct EnvironmentSetupSection: View {
+    @StateObject private var setupService = CalibrationSetupService.shared
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let setup = setupService.currentSetup {
+                HStack {
+                    Text("Environment Setup")
+                        .font(.headline)
+                    Spacer()
+                    Button("Edit") {
+                        // Could show setup flow again to modify
+                    }
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    if let envType = setup.environmentType {
+                        HStack {
+                            Image(systemName: envType.icon)
+                                .foregroundColor(.blue)
+                            Text("\(envType.rawValue)")
+                                .font(.subheadline)
+                        }
+                    }
+                    
+                    if let floors = setup.numberOfFloors {
+                        HStack {
+                            Image(systemName: floors == 1 ? "house" : "building.2")
+                                .foregroundColor(.blue)
+                            Text("\(floors) Floor\(floors > 1 ? "s" : "")")
+                                .font(.subheadline)
+                        }
+                    }
+                    
+                    if let hasHallways = setup.hasHallways {
+                        HStack {
+                            Image(systemName: hasHallways ? "rectangle.split.3x1" : "square")
+                                .foregroundColor(.blue)
+                            Text(hasHallways ? "Has hallways" : "Open floor plan")
+                                .font(.subheadline)
+                        }
+                    }
+                }
+                
+                // Recommendations based on setup
+                let recommendations = setupService.getRecommendations()
+                if !recommendations.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Recommendations:")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .padding(.top, 8)
+                        
+                        ForEach(recommendations.prefix(2), id: \.self) { recommendation in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("•")
+                                    .foregroundColor(.blue)
+                                Text(recommendation)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+        .onAppear {
+            setupService.loadSetupData()
         }
     }
 }
