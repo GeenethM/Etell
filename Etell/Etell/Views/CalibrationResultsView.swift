@@ -10,6 +10,7 @@ import SwiftUI
 struct CalibrationResultsView: View {
     @EnvironmentObject var viewModel: EnhancedCalibrationViewModel
     @Environment(\.dismiss) var dismiss
+    @State private var showingLayoutEditor = false
     
     var body: some View {
         NavigationView {
@@ -18,6 +19,9 @@ struct CalibrationResultsView: View {
                     // Summary Header
                     CalibrationSummaryHeader()
                         .environmentObject(viewModel)
+                    
+                    // Layout Editor Button
+                    LayoutEditorPrompt()
                     
                     // All Calibrated Locations
                     AllLocationsSection()
@@ -47,7 +51,66 @@ struct CalibrationResultsView: View {
                     .fontWeight(.semibold)
                 }
             }
+            .sheet(isPresented: $showingLayoutEditor) {
+                RoomLayoutEditorView(calibratedLocations: viewModel.calibratedLocations)
+            }
         }
+    }
+    
+    // MARK: - Layout Editor Prompt
+    @ViewBuilder
+    private func LayoutEditorPrompt() -> some View {
+        Button(action: {
+            showingLayoutEditor = true
+        }) {
+            VStack(spacing: 12) {
+                HStack {
+                    Image(systemName: "square.grid.3x3")
+                        .font(.title2)
+                        .foregroundColor(.blue)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Arrange Your Room Layout")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        Text("Get precise WiFi recommendations based on your floor plan")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.blue)
+                }
+                
+                HStack {
+                    Text("📐 Drag & resize rooms")
+                    Text("•")
+                    Text("🏢 Multi-floor support")
+                    Text("•")
+                    Text("📡 Smart WiFi placement")
+                    Spacer()
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
+            .padding()
+            .background(
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+            )
+            .cornerRadius(12)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
