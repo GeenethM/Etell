@@ -12,23 +12,24 @@ struct SignUpView: View {
     @EnvironmentObject var notificationService: NotificationService
     @Environment(\.dismiss) var dismiss
     @State private var confirmPassword = ""
+    @State private var enableFaceID = false
     @StateObject private var viewModel = AuthViewModel(authService: FirebaseAuthService(), notificationService: NotificationService())
     
     var isFormValid: Bool {
-        viewModel.isFormValid && confirmPassword == viewModel.password && viewModel.password.count >= 6
+        !viewModel.fullName.isEmpty && viewModel.isFormValid && confirmPassword == viewModel.password && viewModel.password.count >= 6
     }
     
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 32) {
                     // Header
                     VStack(spacing: 8) {
                         Text("Create Account")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
-                        Text("Join Etell and get started with fast, reliable internet")
+                        Text("Fill the fields and create an account")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -36,14 +37,40 @@ struct SignUpView: View {
                     .padding(.top, 40)
                     
                     // Form Fields
-                    VStack(spacing: 20) {
-                        // Email Field
+                    VStack(spacing: 24) {
+                        // Full Name Field
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Email")
+                            Text("Full Name")
                                 .font(.subheadline)
                                 .fontWeight(.medium)
+                                .foregroundColor(.secondary)
                             
-                            HStack {
+                            HStack(spacing: 12) {
+                                Image(systemName: "envelope")
+                                    .foregroundColor(.gray)
+                                    .frame(width: 20)
+                                
+                                TextField("Enter your full name", text: $viewModel.fullName)
+                                    .autocapitalization(.words)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 16)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(.systemGray4), lineWidth: 1)
+                            )
+                        }
+                        
+                        // Email Field
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Email Address")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                            
+                            HStack(spacing: 12) {
                                 Image(systemName: "envelope")
                                     .foregroundColor(.gray)
                                     .frame(width: 20)
@@ -53,9 +80,13 @@ struct SignUpView: View {
                                     .autocapitalization(.none)
                             }
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
+                            .padding(.vertical, 16)
                             .background(Color(.systemGray6))
-                            .cornerRadius(8)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(.systemGray4), lineWidth: 1)
+                            )
                         }
                         
                         // Password Field
@@ -63,22 +94,30 @@ struct SignUpView: View {
                             Text("Password")
                                 .font(.subheadline)
                                 .fontWeight(.medium)
+                                .foregroundColor(.secondary)
                             
-                            HStack {
+                            HStack(spacing: 12) {
                                 Image(systemName: "lock")
                                     .foregroundColor(.gray)
                                     .frame(width: 20)
                                 
-                                SecureField("Create a password", text: $viewModel.password)
+                                SecureField("Enter your password", text: $viewModel.password)
+                                
+                                Button(action: {
+                                    // Toggle password visibility if needed
+                                }) {
+                                    Image(systemName: "eye.slash")
+                                        .foregroundColor(.gray)
+                                }
                             }
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
+                            .padding(.vertical, 16)
                             .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                            
-                            Text("Password must be at least 6 characters")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(.systemGray4), lineWidth: 1)
+                            )
                         }
                         
                         // Confirm Password Field
@@ -86,18 +125,30 @@ struct SignUpView: View {
                             Text("Confirm Password")
                                 .font(.subheadline)
                                 .fontWeight(.medium)
+                                .foregroundColor(.secondary)
                             
-                            HStack {
+                            HStack(spacing: 12) {
                                 Image(systemName: "lock")
                                     .foregroundColor(.gray)
                                     .frame(width: 20)
                                 
-                                SecureField("Confirm your password", text: $confirmPassword)
+                                SecureField("Enter your password", text: $confirmPassword)
+                                
+                                Button(action: {
+                                    // Toggle password visibility if needed
+                                }) {
+                                    Image(systemName: "eye.slash")
+                                        .foregroundColor(.gray)
+                                }
                             }
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
+                            .padding(.vertical, 16)
                             .background(Color(.systemGray6))
-                            .cornerRadius(8)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(.systemGray4), lineWidth: 1)
+                            )
                             
                             if !confirmPassword.isEmpty && confirmPassword != viewModel.password {
                                 Text("Passwords do not match")
@@ -105,40 +156,52 @@ struct SignUpView: View {
                                     .foregroundColor(.red)
                             }
                         }
-                    }
-                    
-                    // Terms and Conditions
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("By creating an account, you agree to our:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
                         
-                        HStack {
-                            Button("Terms of Service") {
-                                // Show terms
-                            }
-                            .font(.caption)
-                            .foregroundColor(.blue)
+                        // Face ID Toggle
+                        HStack(spacing: 12) {
+                            Image(systemName: "faceid")
+                                .foregroundColor(.gray)
+                                .frame(width: 20)
                             
-                            Text("and")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            Text("Enable Face ID for future login")
+                                .font(.body)
+                                .foregroundColor(.primary)
                             
-                            Button("Privacy Policy") {
-                                // Show privacy policy
-                            }
-                            .font(.caption)
-                            .foregroundColor(.blue)
+                            Spacer()
+                            
+                            Toggle("", isOn: $enableFaceID)
+                                .labelsHidden()
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
                     }
-                    .padding(.horizontal)
                     
-                    // Sign Up Button
+                    // Create Account Button
                     Button(action: {
+                        print("📱 SignUpView: Create Account button tapped")
+                        print("📱 SignUpView: viewModel.fullName = '\(viewModel.fullName)'")
+                        print("📱 SignUpView: viewModel.email = '\(viewModel.email)'")
+                        print("📱 SignUpView: Form is valid: \(isFormValid)")
                         Task {
-                            await viewModel.signUp()
-                            if authService.isAuthenticated {
-                                dismiss()
+                            // Use the environment authService directly with form data
+                            print("📱 SignUpView: Calling authService.signUp directly")
+                            do {
+                                try await authService.signUp(
+                                    email: viewModel.email, 
+                                    password: viewModel.password, 
+                                    displayName: viewModel.fullName.isEmpty ? nil : viewModel.fullName
+                                )
+                                print("📱 SignUpView: Direct signup completed successfully")
+                                
+                                if authService.isAuthenticated {
+                                    if enableFaceID {
+                                        notificationService.enableFaceID()
+                                    }
+                                    dismiss()
+                                }
+                            } catch {
+                                print("📱 SignUpView: Direct signup error: \(error.localizedDescription)")
+                                // Handle error - you might want to show an alert here
                             }
                         }
                     }) {
@@ -151,9 +214,10 @@ struct SignUpView: View {
                             Text(viewModel.isLoading ? "Creating Account..." : "Create Account")
                         }
                         .font(.headline)
+                        .fontWeight(.semibold)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding()
+                        .padding(.vertical, 16)
                         .background(isFormValid && !viewModel.isLoading ? Color.blue : Color.gray)
                         .cornerRadius(12)
                     }
@@ -164,24 +228,19 @@ struct SignUpView: View {
                         Text("Already have an account?")
                             .foregroundColor(.secondary)
                         
-                        Button("Sign In") {
+                        Button("Log In") {
                             dismiss()
                         }
                         .foregroundColor(.blue)
+                        .fontWeight(.medium)
                     }
                     .font(.subheadline)
+                    
+                    Spacer(minLength: 50)
                 }
-                .padding()
+                .padding(.horizontal, 24)
             }
-            .navigationTitle("Sign Up")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
+            .navigationBarHidden(true)
         }
         .alert("Error", isPresented: $viewModel.showError) {
             Button("OK") {
@@ -192,6 +251,8 @@ struct SignUpView: View {
         }
         .onAppear {
             // Update viewModel to use environment objects
+            print("📱 SignUpView: onAppear called")
+            print("📱 SignUpView: Environment authService: \(ObjectIdentifier(authService))")
             viewModel.updateServices(authService: authService, notificationService: notificationService)
         }
     }

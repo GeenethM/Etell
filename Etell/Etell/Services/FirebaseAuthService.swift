@@ -17,6 +17,7 @@ class FirebaseAuthService: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     private var authStateHandle: AuthStateDidChangeListenerHandle?
+    private var isSigningUp = false // Flag to prevent auth listener override during signup
     
     init() {
         // For debugging: Clear any existing auth state
@@ -34,18 +35,27 @@ class FirebaseAuthService: ObservableObject {
         // Listen to Firebase auth state changes
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] _, firebaseUser in
             print("🔵 Auth state changed - User: \(firebaseUser?.email ?? "nil")")
+            print("🔵 isSigningUp flag: \(self?.isSigningUp ?? false)")
             DispatchQueue.main.async {
                 if let firebaseUser = firebaseUser {
                     // User is signed in
                     print("🔵 User signed in: \(firebaseUser.email ?? "unknown")")
-                    self?.currentUser = User(
-                        id: firebaseUser.uid,
-                        email: firebaseUser.email ?? "",
-                        displayName: firebaseUser.displayName,
-                        profileImageURL: firebaseUser.photoURL?.absoluteString,
-                        faceIDEnabled: false, // You can store this in Firestore
-                        notificationsEnabled: true
-                    )
+                    print("🔵 DisplayName from Firebase: '\(firebaseUser.displayName ?? "nil")'")
+                    
+                    // Only update currentUser if we're not in the middle of a signup process
+                    if self?.isSigningUp != true {
+                        print("🔵 Updating currentUser from auth state listener")
+                        self?.currentUser = User(
+                            id: firebaseUser.uid,
+                            email: firebaseUser.email ?? "",
+                            displayName: firebaseUser.displayName,
+                            profileImageURL: firebaseUser.photoURL?.absoluteString,
+                            faceIDEnabled: false, // You can store this in Firestore
+                            notificationsEnabled: true
+                        )
+                    } else {
+                        print("🔵 Skipping currentUser update - signup in progress")
+                    }
                     
                     // Check if biometric credentials exist and require authentication
                     if self?.hasBiometricCredentials() == true {
@@ -82,19 +92,90 @@ class FirebaseAuthService: ObservableObject {
         }
     }
     
-    func signUp(email: String, password: String) async throws {
+    func signUp(email: String, password: String, displayName: String? = nil) async throws {
         do {
-            let result = try await Auth.auth().createUser(withEmail: email, password: password)
-            print("User created: \(result.user.uid)")
+            print("🟡 Starting signup with displayName: '\(displayName ?? "nil")'")
+            print("🟡 Firebase Auth available: \(Auth.auth() != nil)")
             
-            // Optionally update the display name
+            // Set flag to prevent auth listener from overriding our user object
+            isSigningUp = true
+            
+            let result = try await Auth.auth().createUser(withEmail: email, password: password)
+            print("🟡 User created: \(result.user.uid)")
+            
+            // Update the display name if provided, otherwise use email prefix
             let changeRequest = result.user.createProfileChangeRequest()
-            changeRequest.displayName = email.components(separatedBy: "@").first
+            let nameToSet = displayName ?? email.components(separatedBy: "@").first
+            changeRequest.displayName = nameToSet
+            print("🟡 About to set displayName to: '\(nameToSet ?? "nil")'")
+            
             try await changeRequest.commitChanges()
+            print("🟡 DisplayName committed successfully")
+            
+            // Reload the user to ensure the profile update is reflected
+            try await result.user.reload()
+            print("🟡 User reloaded after profile update")
+            
+            // Verify the displayName was set
+            if let updatedUser = Auth.auth().currentUser {
+                print("🟡 Verification - User displayName after reload: '\(updatedUser.displayName ?? "nil")'")
+                
+                // Manually update the currentUser with the correct displayName
+                DispatchQueue.main.async { [weak self] in
+                    print("🟡 Manually updating currentUser with displayName")
+                    self?.currentUser = User(
+                        id: updatedUser.uid,
+                        email: updatedUser.email ?? "",
+                        displayName: updatedUser.displayName,
+                        profileImageURL: updatedUser.photoURL?.absoluteString,
+                        faceIDEnabled: false,
+                        notificationsEnabled: true
+                    )
+                    // Force UI update
+                    self?.objectWillChange.send()
+                    print("🟡 currentUser updated with displayName: '\(updatedUser.displayName ?? "nil")'")
+                    print("🟡 Forced UI update sent")
+                    
+                    // Clear the signup flag
+                    self?.isSigningUp = false
+                    print("🟡 isSigningUp flag cleared")
+                }
+            } else {
+                // Clear flag even if user update failed
+                isSigningUp = false
+            }
             
         } catch {
-            print("Sign up error: \(error.localizedDescription)")
+            // Clear flag on error
+            isSigningUp = false
+            print("🔴 Sign up error: \(error.localizedDescription)")
             throw error
+        }
+    }
+    
+    // Method to verify current user's display name
+    func getCurrentUserDisplayName() -> String? {
+        let displayName = Auth.auth().currentUser?.displayName
+        print("🔍 Current user displayName: '\(displayName ?? "nil")'")
+        print("🔍 Current user email: '\(Auth.auth().currentUser?.email ?? "nil")'")
+        print("🔍 Current user uid: '\(Auth.auth().currentUser?.uid ?? "nil")'")
+        return displayName
+    }
+    
+    // Method to refresh user data from Firebase
+    func refreshUserProfile() async {
+        guard let currentUser = Auth.auth().currentUser else {
+            print("🔍 No current user to refresh")
+            return
+        }
+        
+        do {
+            try await currentUser.reload()
+            print("🔍 User profile refreshed successfully")
+            print("🔍 Updated displayName: '\(currentUser.displayName ?? "nil")'")
+            print("🔍 Updated email: '\(currentUser.email ?? "nil")'")
+        } catch {
+            print("🔍 Error refreshing user profile: \(error.localizedDescription)")
         }
     }
     

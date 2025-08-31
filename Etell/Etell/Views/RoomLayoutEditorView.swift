@@ -147,21 +147,21 @@ struct FloorTabBar: View {
 // MARK: - Grid Layout Area
 struct GridLayoutArea: View {
     @EnvironmentObject var viewModel: RoomLayoutEditorViewModel
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Grid Background
                 GridBackground(size: geometry.size)
-                
-                // Room Cards
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                    .shadow(color: .gray.opacity(0.15), radius: 12, x: 0, y: 4)
                 ForEach(viewModel.layoutData.rooms) { room in
                     DraggableRoomCard(room: room)
                         .environmentObject(viewModel)
                 }
             }
-            .background(Color.white)
-            .clipped()
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .padding(.horizontal)
             .onTapGesture {
                 viewModel.deselectRoom()
             }
@@ -173,7 +173,7 @@ struct GridLayoutArea: View {
 struct GridBackground: View {
     let size: CGSize
     private let gridSpacing: CGFloat = 20
-    
+
     var body: some View {
         Canvas { context, canvasSize in
             context.stroke(
@@ -185,7 +185,6 @@ struct GridBackground: View {
                         path.addLine(to: CGPoint(x: x, y: canvasSize.height))
                         x += gridSpacing
                     }
-                    
                     // Horizontal lines
                     var y: CGFloat = 0
                     while y <= canvasSize.height {
@@ -194,8 +193,8 @@ struct GridBackground: View {
                         y += gridSpacing
                     }
                 },
-                with: .color(.gray.opacity(0.2)),
-                lineWidth: 0.5
+                with: .color(.blue.opacity(0.12)),
+                style: StrokeStyle(lineWidth: 1, dash: [4, 4])
             )
         }
     }
@@ -284,37 +283,50 @@ struct RoomCardContent: View {
     
     var body: some View {
         VStack(spacing: 4) {
-            // Room Icon
             Image(systemName: room.calibratedLocation.type.icon)
-                .font(.system(size: min(room.size.width * 0.3, 20)))
+                .font(.system(size: min(room.size.width * 0.3, 24)))
                 .foregroundColor(.white)
-            
-            // Room Name
+                .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
             if room.size.width > 50 {
                 Text(room.calibratedLocation.name)
-                    .font(.system(size: min(room.size.width * 0.15, 12)))
+                    .font(.system(size: min(room.size.width * 0.15, 14)))
                     .fontWeight(.medium)
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
             }
-            
-            // Signal Strength
             if room.size.height > 40 {
                 Text("\(Int(room.calibratedLocation.signalStrength * 100))%")
-                    .font(.system(size: min(room.size.width * 0.12, 10)))
-                    .foregroundColor(.white.opacity(0.8))
+                    .font(.system(size: min(room.size.width * 0.12, 12)))
+                    .fontWeight(.bold)
+                    .foregroundColor(.white.opacity(0.85))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(colorForSignalStrength(room.calibratedLocation.signalStrength))
+            RoundedRectangle(cornerRadius: 12)
+                .fill(LinearGradient(
+                    gradient: Gradient(colors: [
+                        colorForSignalStrength(room.calibratedLocation.signalStrength),
+                        colorForSignalStrength(room.calibratedLocation.signalStrength).opacity(0.7)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 12)
                         .stroke(room.isSelected ? Color.white : Color.clear, lineWidth: 2)
                 )
         )
+        .shadow(color: .black.opacity(room.isSelected ? 0.18 : 0.08), radius: room.isSelected ? 10 : 4, x: 0, y: 2)
+        .overlay(
+            room.isSelected ?
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.blue, lineWidth: 3)
+                    .shadow(color: .blue.opacity(0.3), radius: 8)
+                : nil
+        )
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: room.isSelected)
     }
     
     private func colorForSignalStrength(_ strength: Double) -> Color {

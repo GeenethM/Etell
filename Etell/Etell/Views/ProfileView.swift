@@ -6,60 +6,224 @@
 //
 
 import SwiftUI
+import PhotosUI
 
-// MARK: - Main Profile View (Previously ProfileViewContainer)
+// MARK: - Main Profile View
 struct ProfileView: View {
     @EnvironmentObject var authService: FirebaseAuthService
     @EnvironmentObject var notificationService: NotificationService
     @State private var showingSignOutAlert = false
-    @State private var showingDeleteAccountAlert = false
+    @State private var showingImagePicker = false
+    @State private var selectedImage: PhotosPickerItem?
+    @State private var profileImage: Image?
+    @State private var faceIDEnabled = true
+    @State private var notificationsEnabled = true
+    @State private var darkModeEnabled = false
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    ProfileHeaderSection()
-                    NotificationSettingsSection()
-                    SecuritySettingsSection()
-                    AccountSettingsSection()
-                    AppSettingsSection()
+            VStack(spacing: 0) {
+                // Header with Back button and Title
+                HStack {
+                    Button(action: {
+                        // Handle back action if needed
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Back")
+                        }
+                        .foregroundColor(.blue)
+                    }
                     
-                    VStack(spacing: 12) {
-                        Button(action: {
-                            print("🟠 Sign Out button tapped")
-                            showingSignOutAlert = true
-                        }) {
-                            Text("Sign Out")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .cornerRadius(12)
-                        }
-                        
-                        Button(action: {
-                            showingDeleteAccountAlert = true
-                        }) {
-                            Text("Delete Account")
-                                .font(.subheadline)
-                                .foregroundColor(.red)
-                        }
+                    Spacer()
+                    
+                    Text("Profile")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Spacer()
+                    
+                    // Invisible spacer to center the title
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .opacity(0)
+                        Text("Back")
+                            .opacity(0)
                     }
                 }
-                .padding()
+                .padding(.horizontal)
+                .padding(.top, 8)
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Profile Header
+                        VStack(spacing: 16) {
+                            // Profile Image with edit functionality
+                            ZStack {
+                                Button(action: {
+                                    showingImagePicker = true
+                                }) {
+                                    Group {
+                                        if let profileImage {
+                                            profileImage
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                        } else if let imageURL = authService.currentUser?.profileImageURL {
+                                            AsyncImage(url: URL(string: imageURL)) { image in
+                                                image
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fill)
+                                            } placeholder: {
+                                                Image(systemName: "person.circle.fill")
+                                                    .font(.system(size: 60))
+                                                    .foregroundColor(.blue)
+                                            }
+                                        } else {
+                                            Image(systemName: "person.circle.fill")
+                                                .font(.system(size: 60))
+                                                .foregroundColor(.blue)
+                                        }
+                                    }
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(Circle())
+                                }
+                            }
+                            
+                            // User Info
+                            VStack(spacing: 4) {
+                                Text(authService.currentUser?.displayName ?? "John Smith")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Text(authService.currentUser?.email ?? "johnsmith@example.com")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.top, 20)
+                        
+                        VStack(spacing: 16) {
+                            // Account Details
+                            SettingsRow(
+                                icon: "person.circle",
+                                title: "Account Details",
+                                showChevron: true
+                            ) {
+                                // Handle account details
+                            }
+                            
+                            Divider()
+                            
+                            // Security Section
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("SECURITY")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                }
+                                .padding(.horizontal)
+                                
+                                VStack(spacing: 0) {
+                                    ToggleRow(
+                                        icon: "faceid",
+                                        title: "Enable Face ID",
+                                        isOn: $faceIDEnabled
+                                    )
+                                    
+                                    Divider()
+                                        .padding(.leading, 60)
+                                    
+                                    SettingsRow(
+                                        icon: "lock",
+                                        title: "Change Password",
+                                        showChevron: true
+                                    ) {
+                                        // Handle password change
+                                    }
+                                }
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
+                            }
+                            
+                            // App Preferences Section
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("APP PREFERENCES")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                }
+                                .padding(.horizontal)
+                                
+                                VStack(spacing: 0) {
+                                    ToggleRow(
+                                        icon: "bell",
+                                        title: "Notifications",
+                                        isOn: $notificationsEnabled
+                                    )
+                                    
+                                    Divider()
+                                        .padding(.leading, 60)
+                                    
+                                    ToggleRow(
+                                        icon: "moon",
+                                        title: "Dark Mode",
+                                        isOn: $darkModeEnabled
+                                    )
+                                }
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
+                            }
+                            
+                            // Logout Button
+                            Button(action: {
+                                showingSignOutAlert = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.right.square")
+                                        .foregroundColor(.red)
+                                    Text("Logout")
+                                        .foregroundColor(.red)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                }
+                                .padding()
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(12)
+                            }
+                            .padding(.top, 20)
+                        }
+                        .padding(.horizontal)
+                        
+                        Spacer(minLength: 100) // Space for tab bar
+                    }
+                }
             }
-            .navigationTitle("Profile")
+        }
+        .navigationBarHidden(true)
+        .photosPicker(
+            isPresented: $showingImagePicker,
+            selection: $selectedImage,
+            matching: .images,
+            photoLibrary: .shared()
+        )
+        .onChange(of: selectedImage) { newItem in
+            Task {
+                if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                    if let uiImage = UIImage(data: data) {
+                        profileImage = Image(uiImage: uiImage)
+                    }
+                }
+            }
         }
         .alert("Sign Out", isPresented: $showingSignOutAlert) {
             Button("Sign Out", role: .destructive) {
                 print("🟠 Sign Out confirmed - calling authService.signOut()")
-                // Clear all login data and return to login page
                 authService.signOut()
-                
-                // Additional cleanup if needed
                 notificationService.disableFaceID()
-                
                 print("🟠 Sign out process completed")
             }
             Button("Cancel", role: .cancel) { 
@@ -68,333 +232,60 @@ struct ProfileView: View {
         } message: {
             Text("Are you sure you want to sign out? This will clear all your login data and return you to the login page.")
         }
-        .alert("Delete Account", isPresented: $showingDeleteAccountAlert) {
-            Button("Delete", role: .destructive) {
-                // Clear all data and sign out
-                authService.signOut()
-                print("Account deletion initiated")
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This action cannot be undone. All your data will be permanently deleted.")
-        }
     }
 }
 
-// MARK: - Deprecated - Remove this old ProfileView implementation
-
-struct ProfileHeaderSection: View {
-    @EnvironmentObject var authService: FirebaseAuthService
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            // Profile Image
-            ZStack {
-                Circle()
-                    .fill(Color.blue.opacity(0.1))
-                    .frame(width: 100, height: 100)
-                
-                if let imageURL = authService.currentUser?.profileImageURL {
-                    AsyncImage(url: URL(string: imageURL)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.blue)
-                    }
-                    .frame(width: 100, height: 100)
-                    .clipShape(Circle())
-                } else {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.blue)
-                }
-                
-                // Edit Button
-                Button(action: {
-                    // Handle profile image edit
-                }) {
-                    Image(systemName: "pencil")
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        .frame(width: 24, height: 24)
-                        .background(Color.blue)
-                        .clipShape(Circle())
-                }
-                .offset(x: 35, y: 35)
-            }
-            
-            // User Info
-            VStack(spacing: 4) {
-                Text(authService.currentUser?.displayName ?? "User")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Text(authService.currentUser?.email ?? "")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                Text("Member since \(memberSinceText)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(16)
-    }
-    
-    private var memberSinceText: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: authService.currentUser?.createdAt ?? Date())
-    }
-}
-
-struct NotificationSettingsSection: View {
-    @EnvironmentObject var notificationService: NotificationService
-    @EnvironmentObject var authService: FirebaseAuthService
-    
-    var body: some View {
-        SettingsSection(title: "Notifications") {
-            SettingsToggleRow(
-                title: "Push Notifications",
-                subtitle: "Get alerts about your service",
-                isOn: Binding(
-                    get: { authService.currentUser?.notificationsEnabled ?? false },
-                    set: { newValue in
-                        authService.updateUserSettings(
-                            faceIDEnabled: authService.currentUser?.faceIDEnabled ?? false,
-                            notificationsEnabled: newValue
-                        )
-                        if newValue && !notificationService.isAuthorized {
-                            notificationService.requestNotificationPermission()
-                        }
-                    }
-                )
-            )
-            
-            SettingsRow(
-                title: "Notification Preferences",
-                subtitle: "Customize what notifications you receive",
-                icon: "bell.badge"
-            ) {
-                // Navigate to detailed notification settings
-            }
-        }
-    }
-}
-
-struct SecuritySettingsSection: View {
-    @EnvironmentObject var notificationService: NotificationService
-    @EnvironmentObject var authService: FirebaseAuthService
-    
-    var body: some View {
-        SettingsSection(title: "Security") {
-            SettingsToggleRow(
-                title: notificationService.biometryType == .faceID ? "Face ID" : "Touch ID",
-                subtitle: "Use biometrics to sign in",
-                isOn: Binding(
-                    get: { authService.currentUser?.faceIDEnabled ?? false },
-                    set: { newValue in
-                        authService.updateUserSettings(
-                            faceIDEnabled: newValue,
-                            notificationsEnabled: authService.currentUser?.notificationsEnabled ?? true
-                        )
-                        if newValue {
-                            notificationService.enableFaceID()
-                        } else {
-                            notificationService.disableFaceID()
-                        }
-                    }
-                )
-            )
-            .disabled(!notificationService.isFaceIDAvailable)
-            
-            SettingsRow(
-                title: "Change Password",
-                subtitle: "Update your account password",
-                icon: "key"
-            ) {
-                // Navigate to change password
-            }
-            
-            SettingsRow(
-                title: "Two-Factor Authentication",
-                subtitle: "Add an extra layer of security",
-                icon: "shield"
-            ) {
-                // Navigate to 2FA setup
-            }
-        }
-    }
-}
-
-struct AccountSettingsSection: View {
-    var body: some View {
-        SettingsSection(title: "Account") {
-            SettingsRow(
-                title: "Edit Profile",
-                subtitle: "Update your personal information",
-                icon: "person"
-            ) {
-                // Navigate to edit profile
-            }
-            
-            SettingsRow(
-                title: "Billing & Plans",
-                subtitle: "Manage your subscription",
-                icon: "creditcard"
-            ) {
-                // Navigate to billing
-            }
-            
-            SettingsRow(
-                title: "Usage History",
-                subtitle: "View your data usage over time",
-                icon: "chart.line.uptrend.xyaxis"
-            ) {
-                // Navigate to usage history
-            }
-            
-            SettingsRow(
-                title: "Connected Devices",
-                subtitle: "Manage devices on your network",
-                icon: "wifi"
-            ) {
-                // Navigate to device management
-            }
-        }
-    }
-}
-
-struct AppSettingsSection: View {
-    @AppStorage("isDarkMode") private var isDarkMode = false
-    @AppStorage("temperatureUnit") private var temperatureUnit = "Celsius"
-    
-    var body: some View {
-        SettingsSection(title: "App Settings") {
-            SettingsToggleRow(
-                title: "Dark Mode",
-                subtitle: "Use dark appearance",
-                isOn: $isDarkMode
-            )
-            
-            SettingsRow(
-                title: "Language",
-                subtitle: "English",
-                icon: "globe"
-            ) {
-                // Navigate to language settings
-            }
-            
-            SettingsRow(
-                title: "Privacy Policy",
-                subtitle: "Read our privacy policy",
-                icon: "hand.raised"
-            ) {
-                // Navigate to privacy policy
-            }
-            
-            SettingsRow(
-                title: "Terms of Service",
-                subtitle: "Read our terms of service",
-                icon: "doc.text"
-            ) {
-                // Navigate to terms
-            }
-            
-            SettingsRow(
-                title: "About",
-                subtitle: "App version and information",
-                icon: "info.circle"
-            ) {
-                // Navigate to about page
-            }
-        }
-    }
-}
-
-// MARK: - Supporting Views
-
-struct SettingsSection<Content: View>: View {
-    let title: String
-    let content: Content
-    
-    init(title: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.content = content()
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.headline)
-                .padding(.bottom, 8)
-            
-            VStack(spacing: 0) {
-                content
-            }
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-        }
-    }
-}
+// MARK: - Supporting View Components
 
 struct SettingsRow: View {
-    let title: String
-    let subtitle: String
     let icon: String
+    let title: String
+    let showChevron: Bool
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
-            HStack {
+            HStack(spacing: 16) {
                 Image(systemName: icon)
+                    .font(.system(size: 18))
                     .foregroundColor(.blue)
-                    .frame(width: 24)
+                    .frame(width: 24, height: 24)
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                Text(title)
+                    .font(.body)
+                    .foregroundColor(.primary)
                 
                 Spacer()
                 
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                if showChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
             }
             .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
         }
         .buttonStyle(PlainButtonStyle())
     }
 }
 
-struct SettingsToggleRow: View {
+struct ToggleRow: View {
+    let icon: String
     let title: String
-    let subtitle: String
     @Binding var isOn: Bool
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundColor(.blue)
+                .frame(width: 24, height: 24)
+            
+            Text(title)
+                .font(.body)
+                .foregroundColor(.primary)
             
             Spacer()
             

@@ -14,6 +14,7 @@ import FirebaseAuth
 class AuthViewModel: ObservableObject {
     @Published var email = ""
     @Published var password = ""
+    @Published var fullName = ""
     @Published var isLoading = false
     @Published var errorMessage = ""
     @Published var showError = false
@@ -39,8 +40,12 @@ class AuthViewModel: ObservableObject {
     }
     
     func updateServices(authService: FirebaseAuthService, notificationService: NotificationService) {
+        print("🔧 AuthViewModel: updateServices called")
+        print("🔧 AuthViewModel: Original _authService: \(ObjectIdentifier(self._authService))")
+        print("🔧 AuthViewModel: New authService: \(ObjectIdentifier(authService))")
         self._authService = authService
         self._notificationService = notificationService
+        print("🔧 AuthViewModel: Services updated successfully")
     }
     
     func signIn() async {
@@ -84,7 +89,22 @@ class AuthViewModel: ObservableObject {
         isLoading = true
         
         do {
-            try await _authService.signUp(email: email, password: password)
+            // Pass the fullName as displayName to Firebase
+            print("🟠 AuthViewModel: About to signup with fullName: '\(fullName)'")
+            print("🟠 AuthViewModel: Email: '\(email)', Password length: \(password.count)")
+            print("🟠 AuthViewModel: Using _authService instance: \(ObjectIdentifier(_authService))")
+            try await _authService.signUp(email: email, password: password, displayName: fullName.isEmpty ? nil : fullName)
+            print("🟠 AuthViewModel: Signup completed successfully")
+            
+            // Save Face ID preference if enabled
+            if enableFaceID {
+                _authService.updateUserSettings(
+                    faceIDEnabled: true,
+                    notificationsEnabled: true
+                )
+                _authService.saveBiometricCredentials(email: email, password: password)
+            }
+            
         } catch {
             showErrorMessage(friendlyErrorMessage(from: error))
         }
