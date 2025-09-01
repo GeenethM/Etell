@@ -61,13 +61,14 @@ struct WelcomeHeader: View {
 
 struct ARCalibrationCard: View {
     @State private var showingSetupFlow = false
+    @State private var showingSensorCalibration = false
     
     var body: some View {
         Button(action: {
             showingSetupFlow = true
         }) {
             VStack(spacing: 12) {
-                Image(systemName: "camera.metering.center.weighted")
+                Image(systemName: "sensor.tag.radiowaves.forward")
                     .font(.system(size: 40))
                     .foregroundColor(.white)
                 
@@ -76,9 +77,10 @@ struct ARCalibrationCard: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                 
-                Text("Optimize your router position")
+                Text("Advanced sensor-based WiFi optimization")
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 30)
@@ -93,7 +95,56 @@ struct ARCalibrationCard: View {
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingSetupFlow) {
-            CalibrationSetupFlow()
+            CalibrationSetupFlow { data in
+                print("DEBUG: Setup completed with data: \(data)")
+                
+                // Store data in CalibrationSetupService for persistence
+                CalibrationSetupService.shared.saveSetupData(data)
+                
+                showingSetupFlow = false
+                
+                // Add a small delay to ensure sheet dismissal completes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    print("DEBUG: About to show sensor calibration")
+                    showingSensorCalibration = true
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $showingSensorCalibration) {
+            // Get data from the service instead of local state
+            let savedData = CalibrationSetupService.shared.getSetupData()
+            
+            VStack(spacing: 20) {
+                Text("DEBUG: fullScreenCover presented")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                Text("savedData != nil: \(savedData != nil)")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                
+                if let setupData = savedData {
+                    SensorBasedCalibrationView(setupData: setupData)
+                } else {
+                    // Debug fallback
+                    VStack(spacing: 20) {
+                        Text("Setup Data Missing")
+                            .font(.title)
+                        Text("Please try the setup flow again")
+                            .foregroundColor(.gray)
+                        Text("DEBUG: No saved setup data found")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        Button("Close") {
+                            showingSensorCalibration = false
+                        }
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .padding()
+                }
+            }
         }
     }
 }

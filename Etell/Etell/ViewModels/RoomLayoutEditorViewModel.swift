@@ -44,9 +44,11 @@ class RoomLayoutEditorViewModel: ObservableObject {
     @Published var showingWiFiRecommendations = false
     @Published var wifiRecommendations: WiFiLayoutRecommendations?
     
+    let calibratedLocations: [CalibratedLocation]
     private let gridCellSize: CGFloat = 20
     
     init(calibratedLocations: [CalibratedLocation]) {
+        self.calibratedLocations = calibratedLocations
         setupInitialLayout(from: calibratedLocations)
     }
     

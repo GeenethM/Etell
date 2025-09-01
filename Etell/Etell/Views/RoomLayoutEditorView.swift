@@ -10,6 +10,7 @@ import SwiftUI
 struct RoomLayoutEditorView: View {
     @StateObject private var viewModel: RoomLayoutEditorViewModel
     @Environment(\.dismiss) var dismiss
+    @State private var showing3DView = false
     
     init(calibratedLocations: [CalibratedLocation]) {
         _viewModel = StateObject(wrappedValue: RoomLayoutEditorViewModel(calibratedLocations: calibratedLocations))
@@ -44,12 +45,26 @@ struct RoomLayoutEditorView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Generate WiFi Plan") {
-                        viewModel.generateWiFiRecommendations()
+                    HStack {
+                        Button(action: {
+                            showing3DView = true
+                        }) {
+                            Image(systemName: "cube")
+                                .font(.headline)
+                        }
+                        
+                        Button("Generate WiFi Plan") {
+                            viewModel.generateWiFiRecommendations()
+                        }
+                        .fontWeight(.semibold)
                     }
-                    .fontWeight(.semibold)
-                    .disabled(viewModel.layoutData.floors.isEmpty)
                 }
+            }
+            .sheet(isPresented: $showing3DView) {
+                Room3DVisualizationView(
+                    calibratedLocations: viewModel.calibratedLocations,
+                    layoutData: viewModel.layoutData
+                )
             }
             .sheet(isPresented: $viewModel.showingWiFiRecommendations) {
                 if let recommendations = viewModel.wifiRecommendations {

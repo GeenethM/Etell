@@ -414,6 +414,7 @@
 				DEVELOPMENT_TEAM = S6URMUQ74J;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Etell/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Etell;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Etell uses Face ID to provide secure and convenient access to your account.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Etell uses your location to calibrate WiFi signals and optimize network performance based on your position relative to wireless access points. This helps determine the best WiFi router placement and identify dead zones";
@@ -446,6 +447,7 @@
 				DEVELOPMENT_TEAM = S6URMUQ74J;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Etell/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Etell;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Etell uses Face ID to provide secure and convenient access to your account.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Etell uses your location to calibrate WiFi signals and optimize network performance based on your position relative to wireless access points. This helps determine the best WiFi router placement and identify dead zones";

@@ -8,13 +8,13 @@
 import SwiftUI
 
 // MARK: - Setup Data Model
-struct CalibrationSetupData {
+struct CalibrationSetupData: Codable {
     var environmentType: EnvironmentType?
     var numberOfFloors: Int?
     var hasHallways: Bool?
 }
 
-enum EnvironmentType: String, CaseIterable {
+enum EnvironmentType: String, CaseIterable, Codable {
     case house = "House"
     case apartment = "Apartment"
     case office = "Office"
@@ -42,6 +42,13 @@ struct CalibrationSetupFlow: View {
     @State private var currentStep = 0
     @Environment(\.dismiss) var dismiss
     
+    // Completion handler
+    let onComplete: ((CalibrationSetupData) -> Void)?
+    
+    init(onComplete: ((CalibrationSetupData) -> Void)? = nil) {
+        self.onComplete = onComplete
+    }
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -58,7 +65,7 @@ struct CalibrationSetupFlow: View {
                     FloorsStep(setupData: $setupData, currentStep: $currentStep)
                         .tag(1)
                     
-                    HallwaysStep(setupData: $setupData, currentStep: $currentStep)
+                    HallwaysStep(setupData: $setupData, currentStep: $currentStep, onComplete: onComplete)
                         .tag(2)
                 }
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
@@ -337,6 +344,7 @@ struct HallwaysStep: View {
     @Binding var currentStep: Int
     @Environment(\.dismiss) var dismiss
     @State private var showingCalibration = false
+    let onComplete: ((CalibrationSetupData) -> Void)?
     
     var body: some View {
         VStack(spacing: 24) {
@@ -398,8 +406,21 @@ struct HallwaysStep: View {
                     if setupData.hasHallways != nil {
                         // Save setup data to service
                         CalibrationSetupService.shared.saveSetupData(setupData)
-                        print("Setup completed with data: \(setupData)")
-                        showingCalibration = true
+                        print("DEBUG: Setup completed with data: \(setupData)")
+                        print("DEBUG: Environment: \(setupData.environmentType?.rawValue ?? "nil")")
+                        print("DEBUG: Floors: \(setupData.numberOfFloors ?? 0)")
+                        print("DEBUG: Hallways: \(setupData.hasHallways ?? false)")
+                        
+                        // Call completion handler if provided
+                        if let onComplete = onComplete {
+                            print("DEBUG: Calling onComplete with setupData")
+                            onComplete(setupData)
+                        } else {
+                            print("DEBUG: No completion handler, showing calibration directly")
+                            showingCalibration = true
+                        }
+                    } else {
+                        print("DEBUG: Setup data incomplete, hasHallways is nil")
                     }
                 }) {
                     Text("Start Calibration")

@@ -25,6 +25,10 @@ class CalibrationSetupService: ObservableObject {
         }
     }
     
+    func getSetupData() -> CalibrationSetupData? {
+        return currentSetup ?? loadSetupData()
+    }
+    
     func loadSetupData() -> CalibrationSetupData? {
         if let data = UserDefaults.standard.data(forKey: "calibration_setup_data"),
            let setup = try? JSONDecoder().decode(CalibrationSetupData.self, from: data) {
@@ -81,28 +85,3 @@ class CalibrationSetupService: ObservableObject {
         return recommendations
     }
 }
-
-// Make CalibrationSetupData Codable for persistence
-extension CalibrationSetupData: Codable {
-    enum CodingKeys: String, CodingKey {
-        case environmentType
-        case numberOfFloors
-        case hasHallways
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(environmentType, forKey: .environmentType)
-        try container.encodeIfPresent(numberOfFloors, forKey: .numberOfFloors)
-        try container.encodeIfPresent(hasHallways, forKey: .hasHallways)
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        environmentType = try container.decodeIfPresent(EnvironmentType.self, forKey: .environmentType)
-        numberOfFloors = try container.decodeIfPresent(Int.self, forKey: .numberOfFloors)
-        hasHallways = try container.decodeIfPresent(Bool.self, forKey: .hasHallways)
-    }
-}
-
-extension EnvironmentType: Codable {}
