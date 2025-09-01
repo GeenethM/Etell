@@ -543,7 +543,7 @@ struct CalibratedLocationRow: View {
                     .font(.headline)
                     .foregroundColor(signalColor)
                 
-                Text(DateFormatter.timeOnly.string(from: location.timestamp))
+                Text(DateFormatter.timeFormatter.string(from: location.timestamp))
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
