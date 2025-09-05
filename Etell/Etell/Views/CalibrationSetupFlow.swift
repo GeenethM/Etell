@@ -406,21 +406,13 @@ struct HallwaysStep: View {
                     if setupData.hasHallways != nil {
                         // Save setup data to service
                         CalibrationSetupService.shared.saveSetupData(setupData)
-                        print("DEBUG: Setup completed with data: \(setupData)")
-                        print("DEBUG: Environment: \(setupData.environmentType?.rawValue ?? "nil")")
-                        print("DEBUG: Floors: \(setupData.numberOfFloors ?? 0)")
-                        print("DEBUG: Hallways: \(setupData.hasHallways ?? false)")
                         
                         // Call completion handler if provided
                         if let onComplete = onComplete {
-                            print("DEBUG: Calling onComplete with setupData")
                             onComplete(setupData)
                         } else {
-                            print("DEBUG: No completion handler, showing calibration directly")
                             showingCalibration = true
                         }
-                    } else {
-                        print("DEBUG: Setup data incomplete, hasHallways is nil")
                     }
                 }) {
                     Text("Start Calibration")

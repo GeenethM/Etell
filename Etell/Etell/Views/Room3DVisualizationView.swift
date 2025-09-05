@@ -1,10 +1,3 @@
-//
-//  Room3DVisualizationView.swift
-//  Etell
-//
-//  Created by GitHub Copilot on 2025-09-01.
-//
-
 import SwiftUI
 import SceneKit
 import UIKit
@@ -140,11 +133,16 @@ struct Room3DSceneView: UIViewRepresentable {
     let cameraMode: Room3DVisualizationView.CameraMode
     
     func makeUIView(context: UIViewRepresentableContext<Room3DSceneView>) -> SCNView {
+        print("🚀 Creating SCNView for Room3DVisualizationView")
         let sceneView = SCNView()
         sceneView.scene = createScene()
         sceneView.allowsCameraControl = true
         sceneView.autoenablesDefaultLighting = true
         sceneView.backgroundColor = UIColor.black
+        
+        // Force render to see if we have any content at all
+        sceneView.rendersContinuously = false
+        sceneView.preferredFramesPerSecond = 60
         
         // Add tap gesture
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(context.coordinator.handleTap(_:)))
@@ -188,13 +186,28 @@ struct Room3DSceneView: UIViewRepresentable {
         // Add lighting
         addLighting(to: scene)
         
+        // Add a test sphere if no rooms exist
+        if locations.isEmpty {
+            print("⚠️ No rooms to display, adding test sphere")
+            let testSphere = SCNSphere(radius: 1.0)
+            testSphere.firstMaterial?.diffuse.contents = UIColor.red
+            let testNode = SCNNode(geometry: testSphere)
+            testNode.position = SCNVector3(0, 0, 0)
+            scene.rootNode.addChildNode(testNode)
+        }
+        
+        print("✅ Scene creation completed")
         return scene
     }
     
     private func createFloorPlanes(in scene: SCNScene) {
         let floors = Set(calibratedLocations.map { $0.floor }).sorted()
+        print("🏢 Creating floor planes for floors: \(floors)")
         
-        for floor in floors {
+        // If no floors from calibrated locations, create at least floor 1
+        let floorsToCreate = floors.isEmpty ? [1] : floors
+        
+        for floor in floorsToCreate {
             if let filterFloor = filterFloor, floor != filterFloor {
                 continue
             }
@@ -209,6 +222,7 @@ struct Room3DSceneView: UIViewRepresentable {
             floorNode.name = "floor_\(floor)"
             
             scene.rootNode.addChildNode(floorNode)
+            print("✅ Added floor plane for floor \(floor)")
             
             // Add floor label
             let text = SCNText(string: "Floor \(floor)", extrusionDepth: 0.05)
@@ -367,10 +381,13 @@ struct Room3DSceneView: UIViewRepresentable {
     }
     
     private func addLighting(to scene: SCNScene) {
+        print("💡 Adding lighting to scene")
+        
         // Ambient light
         let ambientLight = SCNLight()
         ambientLight.type = .ambient
-        ambientLight.color = UIColor.white.withAlphaComponent(0.3)
+        ambientLight.color = UIColor.white.withAlphaComponent(0.4)
+        ambientLight.intensity = 500
         let ambientNode = SCNNode()
         ambientNode.light = ambientLight
         scene.rootNode.addChildNode(ambientNode)
@@ -379,12 +396,25 @@ struct Room3DSceneView: UIViewRepresentable {
         let directionalLight = SCNLight()
         directionalLight.type = .directional
         directionalLight.color = UIColor.white
-        directionalLight.intensity = 1000
+        directionalLight.intensity = 1500
+        directionalLight.castsShadow = true
         let directionalNode = SCNNode()
         directionalNode.light = directionalLight
         directionalNode.position = SCNVector3(5, 10, 5)
         directionalNode.look(at: SCNVector3(0, 0, 0))
         scene.rootNode.addChildNode(directionalNode)
+        
+        // Additional omni light for better visibility
+        let omniLight = SCNLight()
+        omniLight.type = .omni
+        omniLight.color = UIColor.white
+        omniLight.intensity = 800
+        let omniNode = SCNNode()
+        omniNode.light = omniLight
+        omniNode.position = SCNVector3(0, 5, 0)
+        scene.rootNode.addChildNode(omniNode)
+        
+        print("✅ Added ambient, directional, and omni lighting")
     }
     
     private func updateCamera(_ sceneView: SCNView) {

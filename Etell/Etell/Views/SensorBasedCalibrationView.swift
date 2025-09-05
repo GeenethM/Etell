@@ -1,10 +1,3 @@
-//
-//  SensorBasedCalibrationView.swift
-//  Etell
-//
-//  Created by GitHub Copilot on 2025-09-01.
-//
-
 import SwiftUI
 import MapKit
 import CoreLocation
@@ -18,6 +11,7 @@ struct SensorBasedCalibrationView: View {
     @State private var totalLocationsToCalibrate = 5
     @State private var showingOptimizationResults = false
     @State private var optimizationResults: WiFiOptimizationResult?
+    @State private var showingRoom3DView = false
     
     let setupData: CalibrationSetupData
     @Environment(\.dismiss) var dismiss
@@ -33,18 +27,6 @@ struct SensorBasedCalibrationView: View {
                 .ignoresSafeArea()
                 
                 VStack(spacing: 20) {
-                    // Debug info
-                    Text("DEBUG: Sensor Calibration View Loaded")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .padding()
-                        .background(Color.yellow.opacity(0.3))
-                        .cornerRadius(8)
-                    
-                    Text("calibrationInstructions: \(calibrationInstructions ? "true" : "false")")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    
                     if calibrationInstructions {
                         InstructionsView(
                             setupData: setupData,
@@ -74,10 +56,18 @@ struct SensorBasedCalibrationView: View {
                 
                 if !calibrationInstructions && (sensorService.currentSession?.points.count ?? 0) >= 3 {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Analyze") {
-                            analyzeResults()
+                        HStack {
+                            Button(action: {
+                                showingRoom3DView = true
+                            }) {
+                                Image(systemName: "cube")
+                            }
+                            
+                            Button("Analyze") {
+                                analyzeResults()
+                            }
+                            .fontWeight(.semibold)
                         }
-                        .fontWeight(.semibold)
                     }
                 }
             }
@@ -94,6 +84,12 @@ struct SensorBasedCalibrationView: View {
                         calibrationPoints: sensorService.currentSession?.points ?? []
                     )
                 }
+            }
+            .sheet(isPresented: $showingRoom3DView) {
+                Room3DVisualizationView(
+                    calibratedLocations: sensorService.getCalibratedLocations(),
+                    layoutData: nil
+                )
             }
         }
     }
@@ -195,14 +191,6 @@ struct InstructionsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 30) {
-                // Debug indicator
-                Text("DEBUG: InstructionsView Loaded")
-                    .font(.caption)
-                    .foregroundColor(.red)
-                    .padding()
-                    .background(Color.yellow.opacity(0.3))
-                    .cornerRadius(8)
-                
                 VStack(spacing: 16) {
                     Image(systemName: "sensor.tag.radiowaves.forward")
                         .font(.system(size: 60))
@@ -545,6 +533,22 @@ struct SensorDataDisplay: View {
             Text("Live Sensor Readings")
                 .font(.headline)
             
+            // WiFi Network Info
+            if !sensorData.wifiSSID.isEmpty {
+                HStack {
+                    Image(systemName: "wifi")
+                        .foregroundColor(.blue)
+                    Text("Connected to: \(sensorData.wifiSSID)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(8)
+            }
+            
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
                 SensorReadingCard(
                     icon: "barometer",
@@ -573,12 +577,41 @@ struct SensorDataDisplay: View {
                     value: "\(sensorData.stepCount)",
                     color: .purple
                 )
+                
+                SensorReadingCard(
+                    icon: "wifi",
+                    title: "WiFi Signal",
+                    value: String(format: "%.0f%%", sensorData.wifiSignalStrength * 100),
+                    color: wifiSignalColor(sensorData.wifiSignalStrength)
+                )
+                
+                SensorReadingCard(
+                    icon: "antenna.radiowaves.left.and.right",
+                    title: "RSSI",
+                    value: "\(sensorData.wifiRSSI) dBm",
+                    color: .indigo
+                )
             }
         }
         .padding()
         .background(Color.white)
         .cornerRadius(16)
         .shadow(color: .gray.opacity(0.1), radius: 5)
+    }
+    
+    private func wifiSignalColor(_ strength: Double) -> Color {
+        switch strength {
+        case 0.8...1.0:
+            return .green
+        case 0.6..<0.8:
+            return .yellow
+        case 0.4..<0.6:
+            return .orange
+        case 0.2..<0.4:
+            return .red
+        default:
+            return .gray
+        }
     }
 }
 

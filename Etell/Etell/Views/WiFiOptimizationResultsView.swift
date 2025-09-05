@@ -1,25 +1,19 @@
-//
-//  WiFiOptimizationResultsView.swift
-//  Etell
-//
-//  Created by GitHub Copilot on 2025-09-01.
-//
-
 import SwiftUI
 import SceneKit
 import MapKit
+import CoreLocation
 
 // MARK: - UIColor Extension
 extension UIColor {
     static let gold = UIColor(red: 1.0, green: 0.843, blue: 0.0, alpha: 1.0)
 }
-import CoreLocation
 
 struct WiFiOptimizationResultsView: View {
     let results: WiFiOptimizationResult
     let calibrationPoints: [SensorCalibrationPoint]
     @Environment(\.dismiss) var dismiss
     @State private var selectedTab = 0
+    @State private var showingRoom3DView = false
     
     var body: some View {
         NavigationView {
@@ -82,10 +76,66 @@ struct WiFiOptimizationResultsView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Share") {
-                        shareResults()
+                    HStack {
+                        Button(action: {
+                            showingRoom3DView = true
+                        }) {
+                            Image(systemName: "cube")
+                            Text("Room 3D")
+                        }
+                        .foregroundColor(.blue)
+                        
+                        Button("Share") {
+                            shareResults()
+                        }
                     }
                 }
+            }
+            .sheet(isPresented: $showingRoom3DView) {
+                // Convert SensorCalibrationPoints to CalibratedLocations for Room3D view
+                let calibratedLocations = calibrationPoints.map { point in
+                    // Determine location type based on name patterns  
+                    let locationType: LocationType
+                    let lowercaseName = point.name.lowercased()
+                    if lowercaseName.contains("hallway") || lowercaseName.contains("corridor") || lowercaseName.contains("hall") {
+                        locationType = .hallway
+                    } else if lowercaseName.contains("stair") || lowercaseName.contains("step") {
+                        locationType = .staircase
+                    } else {
+                        locationType = .room
+                    }
+                    
+                    // Determine floor based on height (simple estimation)
+                    let floor = max(1, Int((point.relativeHeight / 3.0).rounded()) + 1)
+                    
+                    // Generate basic recommendations
+                    var recommendations: [String] = []
+                    if point.signalStrength < 0.3 {
+                        recommendations.append("Consider WiFi extender placement")
+                        recommendations.append("Check for interference sources")
+                    } else if point.signalStrength < 0.5 {
+                        recommendations.append("Signal could be improved")
+                        recommendations.append("Consider router repositioning")
+                    } else if point.signalStrength > 0.8 {
+                        recommendations.append("Excellent signal strength")
+                        recommendations.append("Suitable for high-bandwidth devices")
+                    }
+                    
+                    return CalibratedLocation(
+                        name: point.name,
+                        type: locationType,
+                        floor: floor,
+                        signalStrength: point.signalStrength,
+                        coordinates: point.location,
+                        timestamp: point.timestamp,
+                        recommendations: recommendations
+                    )
+                }
+                
+                Room3DVisualizationView(
+                    calibratedLocations: calibratedLocations,
+                    layoutData: nil
+                )
             }
         }
     }

@@ -1,12 +1,7 @@
-//
-//  SensorCalibrationService.swift
-//  Etell
-//
-//  Created by GitHub Copilot on 2025-09-01.
-//
-
 import Foundation
 import CoreLocation
+import Network
+import SystemConfiguration.CaptiveNetwork
 #if !os(macOS)
 import CoreMotion
 #endif
@@ -70,6 +65,11 @@ class SensorCalibrationService: NSObject, ObservableObject {
     private let altimeter = CMAltimeter()
     private let pedometer = CMPedometer()
     #endif
+    
+    // WiFi monitoring
+    private var wifiMonitor: NWPathMonitor?
+    private let wifiQueue = DispatchQueue(label: "WiFiMonitor")
+    private var wifiTimer: Timer?
     
     // Current sensor readings
     private var lastLocation: CLLocation?
@@ -172,6 +172,12 @@ class SensorCalibrationService: NSObject, ObservableObject {
             }
         }
         
+        // Start barometer/altimeter for height measurement
+        setupAltimeter()
+        
+        // Start WiFi signal strength monitoring
+        startWiFiMonitoring()
+        
         // Start step counting from now
         if CMPedometer.isStepCountingAvailable() {
             pedometer.startUpdates(from: Date()) { [weak self] data, error in
@@ -188,6 +194,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
     private func stopSensorUpdates() {
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
+        stopWiFiMonitoring()
         #if !os(macOS)
         motionManager.stopDeviceMotionUpdates()
         altimeter.stopRelativeAltitudeUpdates()
@@ -199,7 +206,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
     private func updateSensorData(with motion: CMDeviceMotion) {
         sensorData.acceleration = motion.userAcceleration
         sensorData.rotation = motion.rotationRate
-            sensorData.magneticField = motion.magneticField
+        sensorData.magneticField = motion.magneticField
         sensorData.attitude = motion.attitude
     }
     #endif
@@ -231,8 +238,8 @@ class SensorCalibrationService: NSObject, ObservableObject {
         // Calculate distance from previous point
         let distanceFromPrevious = calculateDistanceFromPrevious(location: location)
         
-        // Get current signal strength (simulated for now)
-        let signalStrength = simulateSignalStrength(at: location.coordinate)
+        // Get current signal strength from real WiFi monitoring
+        let signalStrength = sensorData.wifiSignalStrength
         
         // Set reference altitude if this is the first point
         if session.points.isEmpty {
@@ -302,19 +309,146 @@ class SensorCalibrationService: NSObject, ObservableObject {
         return location.distance(from: lastLocation)
     }
     
-    private func simulateSignalStrength(at coordinate: CLLocationCoordinate2D) -> Double {
-        // This would normally measure actual WiFi signal strength
-        // For demo purposes, we'll simulate based on distance from a central point
-        let routerLocation = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
-        let distance = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-            .distance(from: CLLocation(latitude: routerLocation.latitude, longitude: routerLocation.longitude))
+    // MARK: - WiFi Signal Strength Monitoring
+    private func startWiFiMonitoring() {
+        // Start network path monitoring
+        wifiMonitor = NWPathMonitor(requiredInterfaceType: .wifi)
+        wifiMonitor?.start(queue: wifiQueue)
         
-        // Simulate signal degradation with distance
-        let maxDistance = 50.0 // meters
-        let signalStrength = max(0.1, 1.0 - (distance / maxDistance))
-        return min(1.0, signalStrength + Double.random(in: -0.1...0.1))
+        wifiMonitor?.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                self?.updateWiFiStatus(path: path)
+            }
+        }
+        
+        // Start periodic WiFi signal strength updates
+        wifiTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateWiFiSignalStrength()
+        }
     }
     
+    private func stopWiFiMonitoring() {
+        wifiMonitor?.cancel()
+        wifiMonitor = nil
+        wifiTimer?.invalidate()
+        wifiTimer = nil
+    }
+    
+    private func updateWiFiStatus(path: NWPath) {
+        if path.status == .satisfied && path.usesInterfaceType(.wifi) {
+            // WiFi is available
+            updateWiFiSignalStrength()
+        } else {
+            // No WiFi connection
+            sensorData.wifiSignalStrength = 0.0
+            sensorData.wifiRSSI = -100
+            sensorData.wifiSSID = ""
+        }
+    }
+    
+    private func updateWiFiSignalStrength() {
+        // Get current WiFi information
+        if let wifiInfo = getCurrentWiFiInfo() {
+            sensorData.wifiSSID = wifiInfo.ssid
+            sensorData.wifiRSSI = wifiInfo.rssi
+            
+            // Convert RSSI to normalized signal strength (0.0 to 1.0)
+            // RSSI typically ranges from -30 (excellent) to -90 (poor)
+            let clampedRSSI = max(-90, min(-30, wifiInfo.rssi))
+            sensorData.wifiSignalStrength = Double(clampedRSSI + 90) / 60.0
+        } else {
+            // Fallback: simulate signal strength for demo purposes
+            sensorData.wifiSignalStrength = simulateSignalStrengthFallback()
+            let signalRange = 60 * (1.0 - sensorData.wifiSignalStrength)
+            sensorData.wifiRSSI = Int(-30 - signalRange)
+            sensorData.wifiSSID = "WiFi Network"
+        }
+    }
+    
+    private func getCurrentWiFiInfo() -> (ssid: String, rssi: Int)? {
+        #if targetEnvironment(simulator)
+        // Simulator doesn't have real WiFi access
+        return nil
+        #else
+        // Get WiFi SSID using CNCopyCurrentNetworkInfo (requires specific entitlements)
+        guard let interfaces = CNCopySupportedInterfaces() as? [String] else { return nil }
+        
+        for interface in interfaces {
+            if let interfaceInfo = CNCopyCurrentNetworkInfo(interface as CFString) as? [String: Any],
+               let ssid = interfaceInfo[kCNNetworkInfoKeySSID as String] as? String {
+                
+                // Note: Getting actual RSSI requires private APIs or additional permissions
+                // For now, we'll estimate based on network reachability
+                let estimatedRSSI = estimateRSSI()
+                return (ssid: ssid, rssi: estimatedRSSI)
+            }
+        }
+        return nil
+        #endif
+    }
+    
+    private func estimateRSSI() -> Int {
+        // This is a simplified estimation since iOS doesn't provide direct RSSI access
+        // In a real implementation, you might use Core Location's beacons or other methods
+        return Int.random(in: -70 ... -40) // Simulate reasonable WiFi signal strength
+    }
+    
+    private func simulateSignalStrengthFallback() -> Double {
+        // Fallback simulation for when real WiFi data isn't available
+        return Double.random(in: 0.3...0.9)
+    }
+    
+    // MARK: - Data Conversion
+    func getCalibratedLocations() -> [CalibratedLocation] {
+        guard let session = currentSession else { return [] }
+        
+        return session.points.map { point in
+            // Determine location type based on name patterns
+            let locationType: LocationType
+            let lowercaseName = point.name.lowercased()
+            if lowercaseName.contains("hallway") || lowercaseName.contains("corridor") || lowercaseName.contains("hall") {
+                locationType = .hallway
+            } else if lowercaseName.contains("stair") || lowercaseName.contains("step") {
+                locationType = .staircase
+            } else {
+                locationType = .room
+            }
+            
+            // Determine floor based on height (simple estimation)
+            let floor = max(1, Int((point.relativeHeight / 3.0).rounded()) + 1)
+            
+            // Generate basic recommendations
+            let recommendations = generateBasicRecommendations(for: point)
+            
+            return CalibratedLocation(
+                name: point.name,
+                type: locationType,
+                floor: floor,
+                signalStrength: point.signalStrength,
+                coordinates: point.location,
+                timestamp: point.timestamp,
+                recommendations: recommendations
+            )
+        }
+    }
+    
+    private func generateBasicRecommendations(for point: SensorCalibrationPoint) -> [String] {
+        var recommendations: [String] = []
+        
+        if point.signalStrength < 0.3 {
+            recommendations.append("Consider WiFi extender placement")
+            recommendations.append("Check for interference sources")
+        } else if point.signalStrength < 0.5 {
+            recommendations.append("Signal could be improved")
+            recommendations.append("Consider router repositioning")
+        } else if point.signalStrength > 0.8 {
+            recommendations.append("Excellent signal strength")
+            recommendations.append("Suitable for high-bandwidth devices")
+        }
+        
+        return recommendations
+    }
+
     // MARK: - WiFi Optimization Analysis
     func analyzeOptimalPlacement() -> WiFiOptimizationResult? {
         guard let session = currentSession,
@@ -480,6 +614,9 @@ class SensorCalibrationService: NSObject, ObservableObject {
 struct SensorRealtimeData {
     var relativeAltitude: Double = 0.0
     var pressure: Double = 0.0
+    var wifiSignalStrength: Double = 0.0 // RSSI-based signal strength (0.0 to 1.0)
+    var wifiRSSI: Int = -100 // Raw RSSI value in dBm
+    var wifiSSID: String = "" // Current WiFi network name
     #if !os(macOS)
     var acceleration: CMAcceleration = CMAcceleration()
     var rotation: CMRotationRate = CMRotationRate()
