@@ -67,10 +67,10 @@ struct RoomLayoutEditorView: View {
                 )
             }
             .sheet(isPresented: $viewModel.showingWiFiRecommendations) {
-                if let recommendations = viewModel.wifiRecommendations {
-                    WiFiRecommendationsView(recommendations: recommendations)
-                        .environmentObject(viewModel)
-                }
+                // TODO: Update to use WiFiOptimizationResultsView when integrating with sensor calibration
+                Text("WiFi Recommendations")
+                    .padding()
+                    .navigationTitle("WiFi Layout Plan")
             }
         }
     }

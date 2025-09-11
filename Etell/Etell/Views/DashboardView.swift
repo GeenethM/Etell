@@ -60,12 +60,22 @@ struct WelcomeHeader: View {
 }
 
 struct ARCalibrationCard: View {
-    @State private var showingSetupFlow = false
     @State private var showingSensorCalibration = false
     
     var body: some View {
         Button(action: {
-            showingSetupFlow = true
+            // Create default setup data and go directly to calibration
+            let defaultSetupData = CalibrationSetupData(
+                environmentType: .house,
+                numberOfFloors: 1,
+                hasHallways: false
+            )
+            
+            // Save default setup data
+            CalibrationSetupService.shared.saveSetupData(defaultSetupData)
+            
+            // Go directly to sensor calibration
+            showingSensorCalibration = true
         }) {
             VStack(spacing: 12) {
                 Image(systemName: "sensor.tag.radiowaves.forward")
@@ -94,19 +104,6 @@ struct ARCalibrationCard: View {
             .cornerRadius(16)
         }
         .buttonStyle(PlainButtonStyle())
-        .sheet(isPresented: $showingSetupFlow) {
-            CalibrationSetupFlow { data in
-                // Store data in CalibrationSetupService for persistence
-                CalibrationSetupService.shared.saveSetupData(data)
-                
-                showingSetupFlow = false
-                
-                // Add a small delay to ensure sheet dismissal completes
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    showingSensorCalibration = true
-                }
-            }
-        }
         .fullScreenCover(isPresented: $showingSensorCalibration) {
             // Get data from the service instead of local state
             let savedData = CalibrationSetupService.shared.getSetupData()

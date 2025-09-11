@@ -38,14 +38,41 @@ struct CalibrationSession {
 
 struct WiFiOptimizationResult {
     let optimalRouterLocation: SensorCalibrationPoint
-    let recommendedExtenders: [ExtenderRecommendation]
-    let coverageAnalysis: CoverageAnalysis
+    let recommendedExtenders: [SensorExtenderRecommendation]
+    let coverageAnalysis: SensorCoverageAnalysis
     let signalPrediction: SignalPredictionMap
 }
 
 struct SignalPredictionMap {
     let predictions: [String: Double] // Using string key instead of CLLocationCoordinate2D
     let resolution: Double // meters per grid point
+}
+
+// Local types for WiFi optimization (to avoid conflicts with other modules)
+struct SensorExtenderRecommendation {
+    let location: String
+    let floor: Int
+    let reason: String
+    let type: SensorExtenderType
+}
+
+enum SensorExtenderType {
+    case roomExtender
+    case hallwayExtender
+    
+    var description: String {
+        switch self {
+        case .roomExtender: return "Room WiFi Extender"
+        case .hallwayExtender: return "Hallway WiFi Extender"
+        }
+    }
+}
+
+struct SensorCoverageAnalysis {
+    let totalRooms: Int
+    let wellCoveredRooms: Int
+    let weakAreas: Int
+    let coveragePercentage: Double
 }
 
 // MARK: - Sensor Calibration Service
@@ -451,27 +478,39 @@ class SensorCalibrationService: NSObject, ObservableObject {
 
     // MARK: - WiFi Optimization Analysis
     func analyzeOptimalPlacement() -> WiFiOptimizationResult? {
+        print("🔍 analyzeOptimalPlacement called")
+        
         guard let session = currentSession,
               session.points.count >= 3 else {
-            print("❌ Need at least 3 calibration points for analysis")
+            print("❌ Need at least 3 calibration points for analysis. Current points: \(currentSession?.points.count ?? 0)")
             return nil
         }
+        
+        print("✅ Session has \(session.points.count) points, proceeding with analysis")
         
         let points = session.points
         
         // Find optimal router location (center of mass weighted by desired coverage)
+        print("🔍 Finding optimal router location...")
         let optimalLocation = findOptimalRouterLocation(points: points)
         
         // Find weak spots that need extenders
+        print("🔍 Finding weak spots...")
         let weakSpots = points.filter { $0.signalStrength < 0.4 }
+        print("📊 Found \(weakSpots.count) weak spots")
+        
+        print("🔍 Generating extender recommendations...")
         let extenderRecommendations = generateExtenderRecommendations(for: weakSpots, points: points)
         
         // Coverage analysis
+        print("🔍 Analyzing coverage...")
         let coverage = analyzeCoverage(points: points)
         
         // Signal prediction map
+        print("🔍 Generating signal prediction...")
         let signalMap = generateSignalPrediction(points: points, routerLocation: optimalLocation)
         
+        print("✅ Creating WiFiOptimizationResult...")
         return WiFiOptimizationResult(
             optimalRouterLocation: optimalLocation,
             recommendedExtenders: extenderRecommendations,
@@ -529,8 +568,8 @@ class SensorCalibrationService: NSObject, ObservableObject {
         return max(0.0, 1.0 - (heightDifference / 3.0)) // Penalize if more than 3m different
     }
     
-    private func generateExtenderRecommendations(for weakSpots: [SensorCalibrationPoint], points: [SensorCalibrationPoint]) -> [ExtenderRecommendation] {
-        var recommendations: [ExtenderRecommendation] = []
+    private func generateExtenderRecommendations(for weakSpots: [SensorCalibrationPoint], points: [SensorCalibrationPoint]) -> [SensorExtenderRecommendation] {
+        var recommendations: [SensorExtenderRecommendation] = []
         
         for weakSpot in weakSpots {
             let nearestStrongPoint = points
@@ -546,7 +585,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
             if let strongPoint = nearestStrongPoint {
                 let improvement = (0.8 - weakSpot.signalStrength) // Expected improvement
                 
-                let recommendation = ExtenderRecommendation(
+                let recommendation = SensorExtenderRecommendation(
                     location: weakSpot.name,
                     floor: 1, // Default floor
                     reason: "Weak signal (\(Int(weakSpot.signalStrength * 100))%) detected at \(weakSpot.name)",
@@ -560,13 +599,13 @@ class SensorCalibrationService: NSObject, ObservableObject {
         return recommendations
     }
     
-    private func analyzeCoverage(points: [SensorCalibrationPoint]) -> CoverageAnalysis {
+    private func analyzeCoverage(points: [SensorCalibrationPoint]) -> SensorCoverageAnalysis {
         let weakSpots = points.filter { $0.signalStrength < 0.5 }
         let strongSpots = points.filter { $0.signalStrength >= 0.7 }
         
         let coveragePercentage = Double(strongSpots.count) / Double(points.count) * 100
         
-        return CoverageAnalysis(
+        return SensorCoverageAnalysis(
             totalRooms: points.count,
             wellCoveredRooms: strongSpots.count,
             weakAreas: weakSpots.count,

@@ -26,22 +26,25 @@ struct SensorBasedCalibrationView: View {
                 )
                 .ignoresSafeArea()
                 
-                VStack(spacing: 20) {
-                    if calibrationInstructions {
-                        InstructionsView(
-                            setupData: setupData,
-                            sensorService: sensorService,
-                            onStartCalibration: startCalibration
-                        )
-                    } else {
-                        CalibrationActiveView(
-                            sensorService: sensorService,
-                            currentLocationName: $currentLocationName,
-                            showingLocationInput: $showingLocationInput,
-                            totalLocations: totalLocationsToCalibrate,
-                            onComplete: completeCalibration
-                        )
+                ScrollView {
+                    VStack(spacing: 20) {
+                        if calibrationInstructions {
+                            InstructionsView(
+                                setupData: setupData,
+                                sensorService: sensorService,
+                                onStartCalibration: startCalibration
+                            )
+                        } else {
+                            CalibrationActiveView(
+                                sensorService: sensorService,
+                                currentLocationName: $currentLocationName,
+                                showingLocationInput: $showingLocationInput,
+                                totalLocations: totalLocationsToCalibrate,
+                                onComplete: completeCalibration
+                            )
+                        }
                     }
+                    .padding(.bottom, 20) // Extra bottom padding for scrolling
                 }
             }
             .navigationTitle("WiFi Calibration")
@@ -111,13 +114,31 @@ struct SensorBasedCalibrationView: View {
     }
     
     private func completeCalibration() {
+        print("🔄 Complete Calibration button pressed")
+        
+        // End the current session
         sensorService.endCurrentSession()
+        
+        // Analyze results on main thread with error handling
         analyzeResults()
     }
     
     private func analyzeResults() {
-        optimizationResults = sensorService.analyzeOptimalPlacement()
-        showingOptimizationResults = true
+        DispatchQueue.main.async {
+            print("🔍 Starting analysis...")
+            
+            do {
+                if let results = self.sensorService.analyzeOptimalPlacement() {
+                    print("✅ Analysis successful, showing results")
+                    self.optimizationResults = results
+                    self.showingOptimizationResults = true
+                } else {
+                    print("❌ Failed to generate optimization results - need at least 3 calibration points")
+                }
+            } catch {
+                print("💥 Error during analysis: \(error)")
+            }
+        }
     }
 }
 
@@ -383,7 +404,7 @@ struct CalibrationActiveView: View {
     }
     
     var body: some View {
-        VStack(spacing: 24) {
+        LazyVStack(spacing: 20) {
             // Progress Section
             VStack(spacing: 12) {
                 HStack {
@@ -474,14 +495,12 @@ struct CalibrationActiveView: View {
             // Real-time Sensor Data
             SensorDataDisplay(sensorData: sensorService.sensorData)
             
-            // Calibrated Points List
+            // Calibrated Points List with improved layout
             if !(sensorService.currentSession?.points.isEmpty ?? true) {
                 CalibratedPointsList(points: sensorService.currentSession?.points ?? [])
             }
             
-            Spacer()
-            
-            // Action Buttons
+            // Action Buttons - Fixed at bottom
             VStack(spacing: 12) {
                 if completedPoints < totalLocations {
                     Button(action: {
@@ -519,8 +538,9 @@ struct CalibrationActiveView: View {
                     }
                 }
             }
+            .padding(.top, 10)
         }
-        .padding()
+        .padding(.horizontal)
     }
 }
 
@@ -746,11 +766,21 @@ struct CalibratedPointsList: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Calibrated Locations (\(points.count))")
-                .font(.headline)
+            HStack {
+                Text("Calibrated Locations")
+                    .font(.headline)
+                Spacer()
+                Text("(\(points.count))")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
             
-            ForEach(points, id: \.id) { point in
-                CalibratedPointRow(point: point)
+            LazyVStack(spacing: 8) {
+                ForEach(points, id: \.id) { point in
+                    CalibratedPointRow(point: point)
+                        .background(Color.gray.opacity(0.05))
+                        .cornerRadius(8)
+                }
             }
         }
         .padding()
@@ -764,34 +794,63 @@ struct CalibratedPointRow: View {
     let point: SensorCalibrationPoint
     
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "location.fill")
-                .foregroundColor(.blue)
-                .frame(width: 20)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(point.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+        VStack(spacing: 8) {
+            // Top row with name and status
+            HStack(spacing: 12) {
+                Image(systemName: "location.fill")
+                    .foregroundColor(.blue)
+                    .frame(width: 20)
                 
-                Text("Height: \(String(format: "%.1f m", point.relativeHeight)) • Signal: \(Int(point.signalStrength * 100))%")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(point.name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                    
+                    Text("Captured at \(DateFormatter.timeFormatter.string(from: point.timestamp))")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // Signal indicator
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(signalColor(point.signalStrength))
+                        .frame(width: 10, height: 10)
+                    Text("\(Int(point.signalStrength * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 4) {
-                Circle()
-                    .fill(signalColor(point.signalStrength))
-                    .frame(width: 12, height: 12)
+            // Bottom row with metrics
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.circle")
+                        .foregroundColor(.blue)
+                        .font(.caption)
+                    Text("\(String(format: "%.1f m", point.relativeHeight))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 
-                Text(DateFormatter.timeFormatter.string(from: point.timestamp))
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "wifi")
+                        .foregroundColor(.green)
+                        .font(.caption)
+                    Text("Signal Strength")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
+            .padding(.leading, 32) // Align with text above
         }
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
     
     private func signalColor(_ strength: Double) -> Color {

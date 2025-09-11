@@ -140,9 +140,19 @@ struct Room3DSceneView: UIViewRepresentable {
         sceneView.autoenablesDefaultLighting = true
         sceneView.backgroundColor = UIColor.black
         
+        // Enhanced camera controls for better interaction
+        sceneView.defaultCameraController.inertiaEnabled = true
+        sceneView.defaultCameraController.maximumVerticalAngle = 90
+        sceneView.defaultCameraController.minimumVerticalAngle = -90
+        sceneView.defaultCameraController.maximumHorizontalAngle = 180
+        sceneView.defaultCameraController.minimumHorizontalAngle = -180
+        
         // Force render to see if we have any content at all
         sceneView.rendersContinuously = false
         sceneView.preferredFramesPerSecond = 60
+        
+        // Set initial camera position only once
+        setupInitialCamera(sceneView)
         
         // Add tap gesture
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(context.coordinator.handleTap(_:)))
@@ -152,9 +162,13 @@ struct Room3DSceneView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: SCNView, context: UIViewRepresentableContext<Room3DSceneView>) {
-        // Update scene when data changes
-        uiView.scene = createScene()
-        updateCamera(uiView)
+        // Only update scene content, not camera position to preserve user interaction
+        if let scene = uiView.scene {
+            updateSceneContent(scene)
+        } else {
+            uiView.scene = createScene()
+            setupInitialCamera(uiView)
+        }
     }
     
     func makeCoordinator() -> Coordinator {
@@ -415,6 +429,61 @@ struct Room3DSceneView: UIViewRepresentable {
         scene.rootNode.addChildNode(omniNode)
         
         print("✅ Added ambient, directional, and omni lighting")
+    }
+    
+    // Set initial camera position only once
+    private func setupInitialCamera(_ sceneView: SCNView) {
+        guard let camera = sceneView.pointOfView else { return }
+        
+        // Set a good default overview position
+        camera.position = SCNVector3(8, 8, 8)
+        camera.look(at: SCNVector3(0, 2, 0))
+        
+        print("📹 Initial camera position set to overview")
+    }
+    
+    // Update scene content without affecting camera
+    private func updateSceneContent(_ scene: SCNScene) {
+        // Remove existing content nodes (keep camera and lights)
+        scene.rootNode.childNodes.forEach { node in
+            if node.name != "camera" && node.name?.contains("light") != true {
+                node.removeFromParentNode()
+            }
+        }
+        
+        // Filter locations by floor if needed
+        let locations = filterFloor.map { floor in
+            calibratedLocations.filter { $0.floor == floor }
+        } ?? calibratedLocations
+        
+        // Create floor planes
+        createFloorPlanes(in: scene)
+        
+        // Create room nodes
+        for location in locations {
+            let roomNode = createRoomNode(for: location)
+            scene.rootNode.addChildNode(roomNode)
+        }
+        
+        // Add signal lines if enabled
+        if showSignalLines {
+            addSignalLines(to: scene, for: locations)
+        }
+        
+        // Add lighting
+        addLighting(to: scene)
+        
+        // Add a test sphere if no rooms exist
+        if locations.isEmpty {
+            print("⚠️ No rooms to display, adding test sphere")
+            let testSphere = SCNSphere(radius: 1.0)
+            testSphere.firstMaterial?.diffuse.contents = UIColor.red
+            let testNode = SCNNode(geometry: testSphere)
+            testNode.position = SCNVector3(0, 0, 0)
+            scene.rootNode.addChildNode(testNode)
+        }
+        
+        print("🔄 Scene content updated")
     }
     
     private func updateCamera(_ sceneView: SCNView) {
