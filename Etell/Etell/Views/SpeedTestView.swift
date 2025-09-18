@@ -12,34 +12,49 @@ struct SpeedTestView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
-                VStack(spacing: 30) {
-                    // Start Test Button
-                    StartTestButton()
+                LazyVStack(spacing: 24) {
+                    // Hero Section with Start Button
+                    ModernHeroSection()
+                        .environmentObject(viewModel)
                     
                     // Speed Test Gauges
-                    SpeedTestGauges()
+                    ModernSpeedGaugesSection()
+                        .environmentObject(viewModel)
                     
-                    // Last Test Result
-                    LastTestResult()
+                    // Current Test Status
+                    if viewModel.isRunning {
+                        ModernTestStatusCard()
+                            .environmentObject(viewModel)
+                    }
+                    
+                    // Results Summary
+                    if !viewModel.testResults.isEmpty {
+                        ModernResultsSummary()
+                            .environmentObject(viewModel)
+                    }
                     
                     // Test History
-                    TestHistorySection()
+                    ModernTestHistorySection()
+                        .environmentObject(viewModel)
                     
-                    Spacer(minLength: 100) // Space for tab bar
+                    Spacer(minLength: 100)
                 }
-                .padding(.horizontal)
-                .padding(.top, 20)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
             }
-            .navigationTitle("Internet Speed Test")
-            .navigationBarTitleDisplayMode(.inline)
+            .background(.ultraThinMaterial.opacity(0.5))
+            .navigationTitle("Speed Test")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Back") {
-                        dismiss()
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        // Show settings or info
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.secondary)
                     }
-                    .foregroundColor(.blue)
                 }
             }
         }
@@ -47,133 +62,337 @@ struct SpeedTestView: View {
     }
 }
 
-struct StartTestButton: View {
+// MARK: - Hero Section
+struct ModernHeroSection: View {
     @EnvironmentObject var viewModel: SpeedTestViewModel
     
     var body: some View {
-        Button(action: {
-            Task {
-                await viewModel.startSpeedTest()
-            }
-        }) {
-            Text(viewModel.isRunning ? "Testing..." : "Start Test")
+        VStack(spacing: 20) {
+            // Status Text
+            Text(viewModel.currentTest.displayText)
                 .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-                .frame(width: 150, height: 50)
-                .background(viewModel.isRunning ? Color.gray : Color.blue)
-                .cornerRadius(25)
+                .fontWeight(.medium)
+                .foregroundStyle(.secondary)
+                .animation(.easeInOut, value: viewModel.currentTest)
+            
+            // Main Action Button
+            Button {
+                Task {
+                    await viewModel.startSpeedTest()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    if viewModel.isRunning {
+                        ProgressView()
+                            .scaleEffect(0.9)
+                            .tint(.white)
+                    } else {
+                        Image(systemName: "play.fill")
+                            .font(.title3)
+                    }
+                    
+                    Text(viewModel.isRunning ? "Testing..." : "Start Speed Test")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(
+                    LinearGradient(
+                        colors: viewModel.isRunning ? 
+                        [.gray.opacity(0.8), .gray] : 
+                        [.blue, .blue.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                .scaleEffect(viewModel.isRunning ? 0.95 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: viewModel.isRunning)
+            }
+            .disabled(viewModel.isRunning)
+            
+            // Network Info
+            HStack(spacing: 16) {
+                Label("WiFi Connected", systemImage: "wifi")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                Divider()
+                    .frame(height: 12)
+                
+                Label("Good Signal", systemImage: "antenna.radiowaves.left.and.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .disabled(viewModel.isRunning)
+        .padding(.vertical, 32)
+        .padding(.horizontal, 24)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 
-struct SpeedTestGauges: View {
+// MARK: - Speed Gauges Section
+struct ModernSpeedGaugesSection: View {
     @EnvironmentObject var viewModel: SpeedTestViewModel
     
     var body: some View {
-        HStack(spacing: 30) {
-            // Ping Gauge
-            SpeedGauge(
-                title: "PING",
-                value: viewModel.ping,
-                unit: "ms",
-                progress: viewModel.currentTest == .ping ? viewModel.progress : (viewModel.ping > 0 ? 1.0 : 0.0),
-                isActive: viewModel.currentTest == .ping
-            )
+        VStack(spacing: 16) {
+            HStack {
+                Text("Connection Speed")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Spacer()
+            }
             
-            // Download Gauge
-            SpeedGauge(
-                title: "DOWNLOAD",
-                value: viewModel.downloadSpeed,
-                unit: "Mbps",
-                progress: viewModel.currentTest == .download ? viewModel.progress : (viewModel.downloadSpeed > 0 ? 1.0 : 0.0),
-                isActive: viewModel.currentTest == .download
-            )
-            
-            // Upload Gauge
-            SpeedGauge(
-                title: "UPLOAD", 
-                value: viewModel.uploadSpeed,
-                unit: "Mbps",
-                progress: viewModel.currentTest == .upload ? viewModel.progress : (viewModel.uploadSpeed > 0 ? 1.0 : 0.0),
-                isActive: viewModel.currentTest == .upload
-            )
+            HStack(spacing: 16) {
+                ModernSpeedGauge(
+                    title: "Ping",
+                    value: viewModel.ping,
+                    unit: "ms",
+                    progress: viewModel.currentTest == .ping ? viewModel.progress : (viewModel.ping > 0 ? 1.0 : 0.0),
+                    isActive: viewModel.currentTest == .ping,
+                    color: .orange
+                )
+                
+                ModernSpeedGauge(
+                    title: "Download",
+                    value: viewModel.downloadSpeed,
+                    unit: "Mbps",
+                    progress: viewModel.currentTest == .download ? viewModel.progress : (viewModel.downloadSpeed > 0 ? 1.0 : 0.0),
+                    isActive: viewModel.currentTest == .download,
+                    color: .green
+                )
+                
+                ModernSpeedGauge(
+                    title: "Upload",
+                    value: viewModel.uploadSpeed,
+                    unit: "Mbps",
+                    progress: viewModel.currentTest == .upload ? viewModel.progress : (viewModel.uploadSpeed > 0 ? 1.0 : 0.0),
+                    isActive: viewModel.currentTest == .upload,
+                    color: .blue
+                )
+            }
         }
+        .padding(.vertical, 24)
+        .padding(.horizontal, 20)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 
-struct SpeedGauge: View {
+// MARK: - Modern Speed Gauge
+struct ModernSpeedGauge: View {
     let title: String
     let value: Double
     let unit: String
     let progress: Double
     let isActive: Bool
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                // Background circle
+                Circle()
+                    .stroke(.quaternary, lineWidth: 8)
+                    .frame(width: 100, height: 100)
+                
+                // Progress circle
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(
+                        isActive ? 
+                        LinearGradient(colors: [color, color.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                        LinearGradient(colors: [color.opacity(0.8), color.opacity(0.4)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                    )
+                    .frame(width: 100, height: 100)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: progress)
+                
+                // Center content
+                VStack(spacing: 2) {
+                    if value > 0 {
+                        Text(String(format: value < 1 ? "%.1f" : "%.0f", value))
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.primary)
+                    } else {
+                        Text("--")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.tertiary)
+                    }
+                    
+                    Text(unit)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                }
+                
+                // Active indicator
+                if isActive {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 8, height: 8)
+                        .offset(y: -50)
+                        .scaleEffect(isActive ? 1.2 : 1.0)
+                        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isActive)
+                }
+            }
+            
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(isActive ? color : .secondary)
+                .animation(.easeInOut, value: isActive)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Test Status Card
+struct ModernTestStatusCard: View {
+    @EnvironmentObject var viewModel: SpeedTestViewModel
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .foregroundStyle(.blue)
+                    .font(.title3)
+                
+                Text("Testing in Progress")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Spacer()
+                
+                Text("\(Int(viewModel.progress * 100))%")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+            }
+            
+            ProgressView(value: viewModel.progress)
+                .tint(.blue)
+                .scaleEffect(y: 1.5)
+            
+            Text(viewModel.currentTest.displayText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 20)
+        .padding(.horizontal, 20)
+        .background(.blue.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(.blue.opacity(0.2), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Results Summary
+struct ModernResultsSummary: View {
+    @EnvironmentObject var viewModel: SpeedTestViewModel
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("Latest Result")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                if let lastResult = viewModel.testResults.first {
+                    Text(RelativeDateTimeFormatter().localizedString(for: lastResult.timestamp, relativeTo: Date()))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            if let lastResult = viewModel.testResults.first {
+                HStack(spacing: 20) {
+                    ModernResultMetric(
+                        title: "Ping",
+                        value: "\(Int(lastResult.ping))",
+                        unit: "ms",
+                        icon: "timer",
+                        color: .orange
+                    )
+                    
+                    Divider()
+                        .frame(height: 40)
+                    
+                    ModernResultMetric(
+                        title: "Download",
+                        value: "\(Int(lastResult.downloadSpeed))",
+                        unit: "Mbps",
+                        icon: "arrow.down.circle.fill",
+                        color: .green
+                    )
+                    
+                    Divider()
+                        .frame(height: 40)
+                    
+                    ModernResultMetric(
+                        title: "Upload",
+                        value: "\(Int(lastResult.uploadSpeed))",
+                        unit: "Mbps",
+                        icon: "arrow.up.circle.fill",
+                        color: .blue
+                    )
+                }
+            }
+        }
+        .padding(.vertical, 24)
+        .padding(.horizontal, 20)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+    }
+}
+
+// MARK: - Result Metric
+struct ModernResultMetric: View {
+    let title: String
+    let value: String
+    let unit: String
+    let icon: String
+    let color: Color
     
     var body: some View {
         VStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 6)
-                    .frame(width: 80, height: 80)
-                
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(isActive ? Color.blue : Color.gray.opacity(0.5), style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                    .frame(width: 80, height: 80)
-                    .rotationEffect(.degrees(-90))
-                    .animation(.easeInOut, value: progress)
-                
-                Circle()
-                    .fill(isActive ? Color.blue : Color.gray.opacity(0.3))
-                    .frame(width: 12, height: 12)
-            }
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(color)
             
             Text(title)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(.gray)
+                .foregroundStyle(.secondary)
             
-            if value > 0 {
-                Text(String(format: value < 1 ? "%.1f" : "%.0f", value))
-                    .font(.headline)
+            HStack(alignment: .lastTextBaseline, spacing: 2) {
+                Text(value)
+                    .font(.title3)
                     .fontWeight(.bold)
+                
                 Text(unit)
                     .font(.caption)
-                    .foregroundColor(.gray)
-            } else {
-                Text("--")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                Text(unit)
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 }
 
-struct LastTestResult: View {
+// MARK: - Test History Section
+struct ModernTestHistorySection: View {
     @EnvironmentObject var viewModel: SpeedTestViewModel
     
     var body: some View {
-        VStack(spacing: 8) {
-            Text("Last test: \(viewModel.testResults.isEmpty ? "Never" : RelativeDateTimeFormatter().localizedString(for: viewModel.testResults.first?.timestamp ?? Date(), relativeTo: Date()))")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-        }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .gray.opacity(0.1), radius: 4, x: 0, y: 2)
-    }
-}
-
-struct TestHistorySection: View {
-    @EnvironmentObject var viewModel: SpeedTestViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(spacing: 16) {
             HStack {
                 Text("Test History")
                     .font(.title2)
@@ -184,89 +403,141 @@ struct TestHistorySection: View {
                 Button("See All") {
                     // Show full history
                 }
-                .foregroundColor(.blue)
                 .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(.blue)
             }
             
             if viewModel.testResults.isEmpty {
-                Text("No test history available")
-                    .foregroundColor(.gray)
-                    .font(.subheadline)
-                    .padding(.vertical, 20)
-            } else {
-                ForEach(viewModel.testResults.prefix(3)) { result in
-                    TestHistoryRow(result: result)
+                VStack(spacing: 12) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.largeTitle)
+                        .foregroundStyle(.tertiary)
                     
-                    if result.id != viewModel.testResults.prefix(3).last?.id {
-                        Divider()
-                            .padding(.horizontal)
+                    Text("No test history")
+                        .font(.headline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("Run your first speed test to see results here")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.vertical, 32)
+                .frame(maxWidth: .infinity)
+            } else {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(viewModel.testResults.prefix(5).enumerated()), id: \.element.id) { index, result in
+                        ModernTestHistoryRow(result: result)
+                        
+                        if index < min(4, viewModel.testResults.count - 1) {
+                            Divider()
+                                .padding(.horizontal, 16)
+                        }
                     }
                 }
             }
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .gray.opacity(0.1), radius: 4, x: 0, y: 2)
+        .padding(.vertical, 24)
+        .padding(.horizontal, 20)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 
-struct TestHistoryRow: View {
+// MARK: - Test History Row
+struct ModernTestHistoryRow: View {
     let result: SpeedTestResult
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(DateFormatter.dayTime.string(from: result.timestamp))
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+        HStack(spacing: 16) {
+            // Time indicator
+            VStack(spacing: 4) {
+                Text(DateFormatter.timeOnly.string(from: result.timestamp))
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                
+                Text(DateFormatter.dayOnly.string(from: result.timestamp))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 60)
+            
+            // Location
+            VStack(alignment: .leading, spacing: 2) {
+                Text(result.location ?? "Home WiFi")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "wifi")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                     
-                    Text(result.location ?? "Home Wifi")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                    Text("Connected")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            // Results
+            HStack(spacing: 16) {
+                VStack(spacing: 2) {
+                    Text("\(Int(result.ping))")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Text("ms")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
                 
-                Spacer()
+                VStack(spacing: 2) {
+                    Text("\(Int(result.downloadSpeed))")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.green)
+                    Text("down")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 
-                HStack(spacing: 20) {
-                    VStack(alignment: .center, spacing: 2) {
-                        Text("PING")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Text("\(Int(result.ping)) ms")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    
-                    VStack(alignment: .center, spacing: 2) {
-                        Text("DOWN")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Text("\(Int(result.downloadSpeed)) Mbps")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    
-                    VStack(alignment: .center, spacing: 2) {
-                        Text("UP")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Text("\(Int(result.uploadSpeed)) Mbps")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
+                VStack(spacing: 2) {
+                    Text("\(Int(result.uploadSpeed))")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.blue)
+                    Text("up")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
+        .contentShape(Rectangle())
     }
 }
 
+// MARK: - Date Formatters
 extension DateFormatter {
     static let dayTime: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, h:mm a"
+        return formatter
+    }()
+    
+    static let timeOnly: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter
+    }()
+    
+    static let dayOnly: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
         return formatter
     }()
 }

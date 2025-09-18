@@ -104,6 +104,9 @@ class TelecomAPIService: ObservableObject {
         isLoading = true
         errorMessage = nil
         
+        // For demo purposes, use realistic mock data with working image URLs
+        // In production, uncomment the API calls below:
+        /*
         // Fetch from multiple suppliers concurrently
         async let asusProducts = fetchASUSProducts()
         async let netgearProducts = fetchNetgearProducts()
@@ -125,9 +128,13 @@ class TelecomAPIService: ObservableObject {
             
         } catch {
             self.errorMessage = "Failed to fetch products: \(error.localizedDescription)"
-            // Fallback to mock data
+            // Fallback to mock data with working image URLs
             self.products = Product.realisticMockProducts
         }
+        */
+        
+        // Use realistic mock data with working Amazon image URLs
+        self.products = Product.realisticMockProducts
         
         isLoading = false
     }

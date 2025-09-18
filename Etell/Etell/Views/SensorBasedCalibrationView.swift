@@ -9,6 +9,7 @@ struct SensorBasedCalibrationView: View {
     @State private var showingResults = false
     @State private var calibrationInstructions = true
     @State private var totalLocationsToCalibrate = 5
+    @State private var currentFloor = 1
     @State private var showingOptimizationResults = false
     @State private var optimizationResults: WiFiOptimizationResult?
     @State private var showingRoom3DView = false
@@ -77,6 +78,8 @@ struct SensorBasedCalibrationView: View {
             .sheet(isPresented: $showingLocationInput) {
                 LocationInputSheet(
                     locationName: $currentLocationName,
+                    setupData: setupData,
+                    currentFloor: currentFloor,
                     onSave: captureCurrentLocation
                 )
             }
@@ -91,7 +94,8 @@ struct SensorBasedCalibrationView: View {
             .sheet(isPresented: $showingRoom3DView) {
                 Room3DVisualizationView(
                     calibratedLocations: sensorService.getCalibratedLocations(),
-                    layoutData: nil
+                    layoutData: nil,
+                    environmentType: setupData.environmentType
                 )
             }
         }
@@ -107,9 +111,29 @@ struct SensorBasedCalibrationView: View {
         if success {
             currentLocationName = ""
             
+            // Check if we should advance to next floor
+            advanceFloorIfNeeded()
+            
             // Provide haptic feedback
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.impactOccurred()
+        }
+    }
+    
+    private func advanceFloorIfNeeded() {
+        guard let totalFloors = setupData.numberOfFloors,
+              totalFloors > 1,
+              let currentSession = sensorService.currentSession else { return }
+        
+        let pointsPerFloor = max(1, totalLocationsToCalibrate / totalFloors)
+        let currentFloorPoints = currentSession.points.filter { point in
+            point.name.contains("Floor \(currentFloor)") || 
+            (currentFloor == 1 && !point.name.contains("Floor"))
+        }
+        
+        // Advance to next floor when enough points are captured for current floor
+        if currentFloorPoints.count >= pointsPerFloor && currentFloor < totalFloors {
+            currentFloor += 1
         }
     }
     
@@ -665,8 +689,20 @@ struct SensorReadingCard: View {
 // MARK: - Location Input Sheet
 struct LocationInputSheet: View {
     @Binding var locationName: String
+    let setupData: CalibrationSetupData
+    let currentFloor: Int
     let onSave: () -> Void
     @Environment(\.dismiss) var dismiss
+    
+    @State private var selectedFloor: Int
+    
+    init(locationName: Binding<String>, setupData: CalibrationSetupData, currentFloor: Int, onSave: @escaping () -> Void) {
+        self._locationName = locationName
+        self.setupData = setupData
+        self.currentFloor = currentFloor
+        self.onSave = onSave
+        self._selectedFloor = State(initialValue: currentFloor)
+    }
     
     var body: some View {
         NavigationView {
@@ -680,17 +716,37 @@ struct LocationInputSheet: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    Text("Give this WiFi location a descriptive name")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                    VStack(spacing: 4) {
+                        Text("Give this WiFi location a descriptive name")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                        
+                        // Floor information
+                        if let totalFloors = setupData.numberOfFloors, totalFloors > 1 {
+                            HStack(spacing: 6) {
+                                Image(systemName: "building")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                                
+                                Text("Currently calibrating: Floor \(currentFloor) of \(totalFloors)")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.blue)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.blue.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Location Name")
                         .font(.headline)
                     
-                    TextField("e.g. Living Room, Kitchen, Bedroom", text: $locationName)
+                    TextField(floorBasedPlaceholder, text: $locationName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .submitLabel(.done)
                         .onSubmit {
@@ -699,9 +755,38 @@ struct LocationInputSheet: View {
                             }
                         }
                     
-                    Text("Choose a name that describes where you want WiFi coverage")
+                    Text(floorBasedHelperText)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+                
+                // Floor Selection (only show if multi-floor building)
+                if let totalFloors = setupData.numberOfFloors, totalFloors > 1 {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "stairs")
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                            
+                            Text("Select Floor")
+                                .font(.headline)
+                        }
+                        
+                        HStack(spacing: 12) {
+                            ForEach(1...totalFloors, id: \.self) { floor in
+                                FloorSelectionButton(
+                                    floor: floor,
+                                    isSelected: selectedFloor == floor,
+                                    action: { selectedFloor = floor }
+                                )
+                            }
+                            Spacer()
+                        }
+                        
+                        Text("Choose which floor this room is located on")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
                 // Quick selection buttons
@@ -709,7 +794,7 @@ struct LocationInputSheet: View {
                     Text("Quick Options")
                         .font(.headline)
                     
-                    let commonLocations = ["Living Room", "Kitchen", "Bedroom", "Office", "Bathroom", "Hallway"]
+                    let commonLocations = floorBasedQuickOptions
                     
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 8) {
                         ForEach(commonLocations, id: \.self) { location in
@@ -754,9 +839,94 @@ struct LocationInputSheet: View {
         }
     }
     
+    // Computed properties for floor-based content
+    private var floorBasedPlaceholder: String {
+        if let totalFloors = setupData.numberOfFloors, totalFloors > 1 {
+            return "e.g. Living Room, Kitchen Floor \(selectedFloor)"
+        } else {
+            return "e.g. Living Room, Kitchen, Bedroom"
+        }
+    }
+    
+    private var floorBasedHelperText: String {
+        if let totalFloors = setupData.numberOfFloors, totalFloors > 1 {
+            return "Name the room/area on Floor \(selectedFloor) where you want WiFi coverage"
+        } else {
+            return "Choose a name that describes where you want WiFi coverage"
+        }
+    }
+    
+    private var floorBasedQuickOptions: [String] {
+        let baseLocations: [String]
+        
+        // Different suggestions based on environment type
+        switch setupData.environmentType {
+        case .office:
+            baseLocations = ["Conference Room", "Office", "Reception", "Break Room", "Storage", "Hallway"]
+        case .house, .apartment, .none:
+            baseLocations = ["Living Room", "Kitchen", "Bedroom", "Office", "Bathroom", "Hallway"]
+        }
+        
+        // Add floor suffix if multi-floor building
+        if let totalFloors = setupData.numberOfFloors, totalFloors > 1 {
+            return baseLocations.map { "\($0) - Floor \(selectedFloor)" }
+        } else {
+            return baseLocations
+        }
+    }
+    
     private func saveLocation() {
+        // Update location name to include floor if multi-floor building and not already specified
+        if let totalFloors = setupData.numberOfFloors, 
+           totalFloors > 1, 
+           !locationName.contains("Floor") {
+            locationName = "\(locationName) - Floor \(selectedFloor)"
+        }
+        
         onSave()
         dismiss()
+    }
+}
+
+// MARK: - Floor Selection Button
+struct FloorSelectionButton: View {
+    let floor: Int
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Text("\(floor)")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(isSelected ? .white : .blue)
+                
+                Text("Floor")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+            }
+            .frame(width: 60, height: 60)
+            .background(
+                Group {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(.blue.gradient)
+                    } else {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.clear)
+                    }
+                }
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isSelected ? Color.clear : Color(UIColor.quaternaryLabel), lineWidth: 1.5)
+            )
+            .scaleEffect(isSelected ? 1.02 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

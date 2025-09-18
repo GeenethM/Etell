@@ -35,9 +35,22 @@
 		424A2A9F2E504FC900662242 /* EtellUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EtellUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		7E8210102E7C03A100F12A59 /* Exceptions for "Etell" folder in "Etell" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 424A2A872E504FC800662242 /* Etell */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		424A2A8A2E504FC800662242 /* Etell */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				7E8210102E7C03A100F12A59 /* Exceptions for "Etell" folder in "Etell" target */,
+			);
 			path = Etell;
 			sourceTree = "<group>";
 		};
@@ -414,6 +427,7 @@
 				DEVELOPMENT_TEAM = S6URMUQ74J;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Etell/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Etell;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Etell uses Face ID to provide secure and convenient access to your account.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Etell uses your location to calibrate WiFi signals and optimize network performance based on your position relative to wireless access points. This helps determine the best WiFi router placement and identify dead zones";
@@ -447,6 +461,7 @@
 				DEVELOPMENT_TEAM = S6URMUQ74J;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Etell/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Etell;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Etell uses Face ID to provide secure and convenient access to your account.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Etell uses your location to calibrate WiFi signals and optimize network performance based on your position relative to wireless access points. This helps determine the best WiFi router placement and identify dead zones";

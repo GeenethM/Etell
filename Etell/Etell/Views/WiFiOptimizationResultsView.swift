@@ -90,7 +90,8 @@ struct WiFiOptimizationResultsView: View {
                     
                     Room3DVisualizationView(
                         calibratedLocations: calibratedLocations,
-                        layoutData: nil
+                        layoutData: nil,
+                        environmentType: nil
                     )
                 }
             }

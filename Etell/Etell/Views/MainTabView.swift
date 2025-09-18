@@ -11,6 +11,17 @@ struct MainTabView: View {
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @EnvironmentObject var authService: FirebaseAuthService
     
+    init() {
+        // Configure tab bar appearance
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor.systemBackground
+        appearance.shadowColor = UIColor.separator
+        
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+    
     var body: some View {
         TabView {
             DashboardView()

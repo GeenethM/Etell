@@ -63,7 +63,8 @@ struct RoomLayoutEditorView: View {
             .sheet(isPresented: $showing3DView) {
                 Room3DVisualizationView(
                     calibratedLocations: viewModel.calibratedLocations,
-                    layoutData: viewModel.layoutData
+                    layoutData: viewModel.layoutData,
+                    environmentType: .house
                 )
             }
             .sheet(isPresented: $viewModel.showingWiFiRecommendations) {
