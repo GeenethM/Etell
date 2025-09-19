@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Firebase
+import UserNotifications
 
 @main
 struct EtellApp: App {
@@ -15,6 +16,9 @@ struct EtellApp: App {
     
     init() {
         FirebaseApp.configure()
+        
+        // Configure local notifications
+        UNUserNotificationCenter.current().delegate = notificationService
     }
     
     var body: some Scene {

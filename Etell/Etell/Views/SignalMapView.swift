@@ -49,6 +49,10 @@ struct SignalMapView: View {
         )
     )
     
+    // Track current zoom level for zoom controls
+    @State private var currentZoomSpan = MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+    @State private var currentMapCenter = CLLocationCoordinate2D(latitude: 6.9271, longitude: 79.8612)
+    
     @State private var signalTowers: [SignalTower] = [
         SignalTower(coordinate: CLLocationCoordinate2D(latitude: 6.9271, longitude: 79.8612), name: "Colombo Central", signalStrength: 0.9, range: 2000, provider: "Dialog", technology: "5G", address: "World Trade Center, Colombo 01"),
         SignalTower(coordinate: CLLocationCoordinate2D(latitude: 6.9344, longitude: 79.8428), name: "Fort Tower", signalStrength: 0.85, range: 1800, provider: "Mobitel", technology: "4G", address: "Fort Railway Station, Colombo 01"),
@@ -149,6 +153,39 @@ struct SignalMapView: View {
                     .padding(.top, 8)
                     
                     Spacer()
+                    
+                    // Right Side Zoom Controls
+                    VStack {
+                        Spacer()
+                        
+                        HStack {
+                            Spacer()
+                            
+                            VStack(spacing: 8) {
+                                // Zoom In Button
+                                Button {
+                                    zoomIn()
+                                } label: {
+                                    Image(systemName: "plus")
+                                        .font(.title2)
+                                        .foregroundStyle(.primary)
+                                }
+                                .buttonStyle(ModernMapControlStyle())
+                                
+                                // Zoom Out Button
+                                Button {
+                                    zoomOut()
+                                } label: {
+                                    Image(systemName: "minus")
+                                        .font(.title2)
+                                        .foregroundStyle(.primary)
+                                }
+                                .buttonStyle(ModernMapControlStyle())
+                            }
+                            .padding(.trailing, 16)
+                        }
+                        .padding(.bottom, 120) // Position above the bottom controls
+                    }
                     
                     // Bottom Controls
                     HStack {
@@ -260,9 +297,12 @@ struct SignalMapView: View {
     
     private func moveToLocation(_ coordinate: CLLocationCoordinate2D) {
         withAnimation(.easeInOut(duration: 0.8)) {
+            let newSpan = MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            currentMapCenter = coordinate
+            currentZoomSpan = newSpan
             cameraPosition = .region(MKCoordinateRegion(
                 center: coordinate,
-                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+                span: newSpan
             ))
         }
     }
@@ -319,6 +359,41 @@ struct SignalMapView: View {
                 )
             }
         }
+    }
+    
+    private func zoomIn() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            let newSpan = MKCoordinateSpan(
+                latitudeDelta: max(currentZoomSpan.latitudeDelta * 0.5, 0.001),
+                longitudeDelta: max(currentZoomSpan.longitudeDelta * 0.5, 0.001)
+            )
+            currentZoomSpan = newSpan
+            cameraPosition = .region(MKCoordinateRegion(
+                center: currentMapCenter,
+                span: newSpan
+            ))
+        }
+    }
+    
+    private func zoomOut() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            let newSpan = MKCoordinateSpan(
+                latitudeDelta: min(currentZoomSpan.latitudeDelta * 2.0, 10.0),
+                longitudeDelta: min(currentZoomSpan.longitudeDelta * 2.0, 10.0)
+            )
+            currentZoomSpan = newSpan
+            cameraPosition = .region(MKCoordinateRegion(
+                center: currentMapCenter,
+                span: newSpan
+            ))
+        }
+    }
+    
+    private func getCurrentRegion() -> MKCoordinateRegion {
+        return MKCoordinateRegion(
+            center: currentMapCenter,
+            span: currentZoomSpan
+        )
     }
 }
 

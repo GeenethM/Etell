@@ -7,6 +7,9 @@
 
 import SwiftUI
 import PhotosUI
+import Firebase
+import FirebaseAuth
+import FirebaseFirestore
 
 // MARK: - Main Profile View
 struct ProfileView: View {
@@ -16,11 +19,12 @@ struct ProfileView: View {
     @State private var showingImagePicker = false
     @State private var selectedImage: PhotosPickerItem?
     @State private var profileImage: Image?
-    @State private var faceIDEnabled = true
-    @State private var notificationsEnabled = true
     @State private var darkModeEnabled = false
     @State private var showingAccountDetails = false
     @State private var showingPasswordChange = false
+    @State private var showingPendingOrders = false
+    @State private var pendingOrders: [Order] = []
+    @State private var isLoadingOrders = false
     
     var body: some View {
         NavigationStack {
@@ -78,8 +82,19 @@ struct ProfileView: View {
         } message: {
             Text("Are you sure you want to sign out? This will clear all your login data and return you to the login page.")
         }
+        .sheet(isPresented: $showingPendingOrders) {
+            PendingOrdersView(orders: $pendingOrders, isLoading: $isLoadingOrders)
+        }
         .environmentObject(authService)
         .environmentObject(notificationService)
+        .onAppear {
+            // Refresh notification permission status when view appears
+            notificationService.requestNotificationPermission()
+            // Load pending orders
+            Task {
+                await loadPendingOrders()
+            }
+        }
     }
     
     // MARK: - Profile Header
@@ -186,10 +201,25 @@ struct ProfileView: View {
                 ModernToggleRow(
                     icon: "faceid",
                     title: "Face ID",
-                    subtitle: "Use Face ID to unlock the app",
-                    isOn: $faceIDEnabled,
-                    iconColor: .blue
+                    subtitle: notificationService.isFaceIDAvailable ? "Use Face ID to unlock the app" : "Face ID not available on this device",
+                    isOn: $notificationService.isFaceIDEnabled,
+                    iconColor: .blue,
+                    action: { enabled in
+                        if enabled {
+                            Task {
+                                let success = await notificationService.authenticateWithBiometrics()
+                                if success {
+                                    notificationService.enableFaceID()
+                                } else {
+                                    notificationService.isFaceIDEnabled = false
+                                }
+                            }
+                        } else {
+                            notificationService.disableFaceID()
+                        }
+                    }
                 )
+                .disabled(!notificationService.isFaceIDAvailable)
                 
                 Divider()
                     .padding(.leading, 60)
@@ -233,9 +263,19 @@ struct ProfileView: View {
                 ModernToggleRow(
                     icon: "bell.badge",
                     title: "Push Notifications",
-                    subtitle: "Receive alerts and updates",
-                    isOn: $notificationsEnabled,
-                    iconColor: .red
+                    subtitle: notificationService.isAuthorized ? "Notifications are enabled" : "Enable to receive alerts and updates",
+                    isOn: $notificationService.isAuthorized,
+                    iconColor: .red,
+                    action: { enabled in
+                        if enabled {
+                            notificationService.requestNotificationPermission()
+                        } else {
+                            // Open Settings to disable notifications
+                            if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(settingsUrl)
+                            }
+                        }
+                    }
                 )
                 
                 Divider()
@@ -289,13 +329,16 @@ struct ProfileView: View {
                     .padding(.leading, 60)
                 
                 ModernSettingsRow(
-                    icon: "creditcard",
-                    title: "Billing & Payments",
-                    subtitle: "Manage payment methods",
-                    iconColor: .green,
+                    icon: "bag.badge",
+                    title: "Pending Orders",
+                    subtitle: pendingOrders.isEmpty ? "No pending orders" : "\(pendingOrders.count) order\(pendingOrders.count == 1 ? "" : "s")",
+                    iconColor: .orange,
                     showChevron: true
                 ) {
-                    // Handle billing
+                    showingPendingOrders = true
+                    Task {
+                        await loadPendingOrders()
+                    }
                 }
                 
                 Divider()
@@ -409,6 +452,16 @@ struct ModernToggleRow: View {
     let subtitle: String
     @Binding var isOn: Bool
     let iconColor: Color
+    let action: ((Bool) -> Void)?
+    
+    init(icon: String, title: String, subtitle: String, isOn: Binding<Bool>, iconColor: Color, action: ((Bool) -> Void)? = nil) {
+        self.icon = icon
+        self.title = title
+        self.subtitle = subtitle
+        self._isOn = isOn
+        self.iconColor = iconColor
+        self.action = action
+    }
     
     var body: some View {
         HStack(spacing: 16) {
@@ -432,9 +485,459 @@ struct ModernToggleRow: View {
             
             Toggle("", isOn: $isOn)
                 .labelsHidden()
+                .onChange(of: isOn) { _, newValue in
+                    action?(newValue)
+                }
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 20)
+    }
+}
+
+// MARK: - Helper Functions
+extension ProfileView {
+    private func loadPendingOrders() async {
+        guard let currentUser = Auth.auth().currentUser else {
+            print("❌ No authenticated user found")
+            return
+        }
+        
+        DispatchQueue.main.async {
+            self.isLoadingOrders = true
+        }
+        
+        do {
+            let db = Firestore.firestore()
+            let snapshot = try await db.collection("users")
+                .document(currentUser.uid)
+                .collection("orders")
+                .order(by: "orderDate", descending: true)
+                .getDocuments()
+            
+            let orders = snapshot.documents.compactMap { document in
+                return Order.fromFirestoreData(document.data())
+            }
+            
+            DispatchQueue.main.async {
+                self.pendingOrders = orders
+                self.isLoadingOrders = false
+            }
+            
+            print("✅ Loaded \(orders.count) orders for user")
+        } catch {
+            print("❌ Error loading orders: \(error.localizedDescription)")
+            DispatchQueue.main.async {
+                self.isLoadingOrders = false
+            }
+        }
+    }
+}
+
+// MARK: - Pending Orders View
+struct PendingOrdersView: View {
+    @Binding var orders: [Order]
+    @Binding var isLoading: Bool
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                
+                if isLoading {
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("Loading Orders...")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if orders.isEmpty {
+                    // Empty State
+                    VStack(spacing: 24) {
+                        VStack(spacing: 16) {
+                            Image(systemName: "bag")
+                                .font(.system(size: 50))
+                                .foregroundStyle(.secondary)
+                            
+                            VStack(spacing: 8) {
+                                Text("No Orders Yet")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.primary)
+                                
+                                Text("Your order history will appear here")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                        
+                        Button("Browse Store") {
+                            dismiss()
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 12)
+                        .background(.blue.gradient, in: Capsule())
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // Orders List
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(orders) { order in
+                                OrderRowView(order: order)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 100)
+                    }
+                }
+            }
+            .navigationTitle("Your Orders")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .fontWeight(.medium)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Order Row View
+struct OrderRowView: View {
+    let order: Order
+    @State private var showingOrderDetail = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Order Header
+            HStack(alignment: .top, spacing: 12) {
+                // Order Status Icon
+                VStack {
+                    Image(systemName: order.status.icon)
+                        .font(.title3)
+                        .foregroundStyle(colorForStatus(order.status))
+                        .frame(width: 40, height: 40)
+                        .background(colorForStatus(order.status).opacity(0.1), in: Circle())
+                }
+                
+                // Order Info
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Order #\(String(order.id.prefix(8)))")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
+                        
+                        Spacer()
+                        
+                        Text(order.status.rawValue)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(colorForStatus(order.status))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(colorForStatus(order.status).opacity(0.1), in: Capsule())
+                    }
+                    
+                    Text("\(order.items.count) item\(order.items.count == 1 ? "" : "s") • $\(order.totalAmount, specifier: "%.2f")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("Ordered \(order.orderDate.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    if let delivery = order.estimatedDelivery {
+                        Text("Estimated delivery: \(delivery.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                    }
+                }
+            }
+            .padding(16)
+            
+            // Order Items Preview
+            if !order.items.isEmpty {
+                Divider()
+                    .padding(.horizontal, 16)
+                
+                VStack(spacing: 8) {
+                    ForEach(order.items.prefix(2)) { item in
+                        HStack(spacing: 12) {
+                            AsyncImage(url: URL(string: item.productImageURL)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            } placeholder: {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(.ultraThinMaterial)
+                                    .overlay(
+                                        Image(systemName: "cube.box")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    )
+                            }
+                            .frame(width: 40, height: 40)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.productName)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                
+                                Text("Qty: \(item.quantity) • $\(item.price, specifier: "%.2f")")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                        }
+                    }
+                    
+                    if order.items.count > 2 {
+                        Text("and \(order.items.count - 2) more item\(order.items.count - 2 == 1 ? "" : "s")")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 52)
+                    }
+                }
+                .padding(16)
+            }
+        }
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(UIColor.quaternaryLabel), lineWidth: 0.5)
+        )
+        .onTapGesture {
+            showingOrderDetail = true
+        }
+        .sheet(isPresented: $showingOrderDetail) {
+            OrderDetailView(order: order)
+        }
+    }
+    
+    private func colorForStatus(_ status: Order.OrderStatus) -> Color {
+        switch status {
+        case .pending: return .orange
+        case .processing: return .blue
+        case .shipped: return .purple
+        case .delivered: return .green
+        case .cancelled: return .red
+        }
+    }
+}
+
+// MARK: - Order Detail View
+struct OrderDetailView: View {
+    let order: Order
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Order Status Section
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Order Status")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                        
+                        HStack(spacing: 12) {
+                            Image(systemName: order.status.icon)
+                                .font(.title)
+                                .foregroundStyle(colorForStatus(order.status))
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(order.status.rawValue)
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.primary)
+                                
+                                Text("Order #\(String(order.id.prefix(8)))")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                
+                                Text("Placed on \(order.orderDate.formatted(date: .complete, time: .omitted))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(16)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    
+                    // Items Section
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Order Items")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                        
+                        VStack(spacing: 12) {
+                            ForEach(order.items) { item in
+                                HStack(spacing: 12) {
+                                    AsyncImage(url: URL(string: item.productImageURL)) { image in
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                    } placeholder: {
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(.ultraThinMaterial)
+                                            .overlay(
+                                                Image(systemName: "cube.box")
+                                                    .font(.title3)
+                                                    .foregroundStyle(.secondary)
+                                            )
+                                    }
+                                    .frame(width: 60, height: 60)
+                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(item.productName)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .foregroundStyle(.primary)
+                                            .lineLimit(2)
+                                        
+                                        Text(item.category)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        
+                                        HStack {
+                                            Text("Qty: \(item.quantity)")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                            
+                                            Spacer()
+                                            
+                                            Text("$\(item.price, specifier: "%.2f")")
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                                .foregroundStyle(.blue)
+                                        }
+                                    }
+                                }
+                                .padding(12)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            }
+                        }
+                    }
+                    
+                    // Billing Information
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Billing Information")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            DetailRow(title: "Name", value: order.billingInfo.fullName)
+                            DetailRow(title: "Email", value: order.billingInfo.email)
+                            DetailRow(title: "Address", value: order.billingInfo.formattedAddress)
+                            DetailRow(title: "Payment Method", value: order.paymentMethod)
+                        }
+                        .padding(16)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    
+                    // Order Summary
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Order Summary")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                        
+                        VStack(spacing: 8) {
+                            HStack {
+                                Text("Items (\(order.items.count))")
+                                Spacer()
+                                Text("$\(order.totalAmount, specifier: "%.2f")")
+                            }
+                            
+                            HStack {
+                                Text("Shipping")
+                                Spacer()
+                                Text("Free")
+                                    .foregroundStyle(.green)
+                            }
+                            
+                            Divider()
+                            
+                            HStack {
+                                Text("Total")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                                Text("$\(order.totalAmount, specifier: "%.2f")")
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.blue)
+                            }
+                        }
+                        .padding(16)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 100)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Order Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .fontWeight(.medium)
+                }
+            }
+        }
+    }
+    
+    private func colorForStatus(_ status: Order.OrderStatus) -> Color {
+        switch status {
+        case .pending: return .orange
+        case .processing: return .blue
+        case .shipped: return .purple
+        case .delivered: return .green
+        case .cancelled: return .red
+        }
+    }
+}
+
+struct DetailRow: View {
+    let title: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            
+            Spacer()
+            
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.trailing)
+        }
     }
 }
 

@@ -35,9 +35,6 @@ struct DashboardView: View {
                     // Quick Actions Grid
                     QuickActionsGrid()
                     
-                    // Recent Activity Section
-                    RecentActivitySection()
-                    
                     Spacer(minLength: 100) // Space for tab bar
                 }
                 .padding(.horizontal, 20)
@@ -275,7 +272,7 @@ struct DataUsageOverviewCard: View {
                 
                 Spacer()
                 
-                NavigationLink(destination: DataPlanView()) {
+                NavigationLink(destination: DataUsageAnalyticsView()) {
                     Text("View Details")
                         .font(.subheadline)
                         .fontWeight(.medium)
@@ -587,112 +584,6 @@ struct EnhancedQuickActionCard: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 isHovered = hovering
             }
-        }
-    }
-}
-
-// MARK: - Recent Activity Section
-struct RecentActivitySection: View {
-    @EnvironmentObject var viewModel: DashboardViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Recent Activity")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                Button("View All") {
-                    // Handle view all action
-                }
-                .font(.subheadline)
-                .foregroundColor(.blue)
-            }
-            .padding(.horizontal, 4)
-            
-            LazyVStack(spacing: 12) {
-                ForEach(viewModel.recentActivities.prefix(3)) { activity in
-                    ActivityRow(activity: activity)
-                }
-            }
-        }
-    }
-}
-
-struct ActivityRow: View {
-    let activity: DashboardViewModel.Activity
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: activityIcon)
-                .font(.title3)
-                .foregroundStyle(activityColor.gradient)
-                .frame(width: 32, height: 32)
-                .background(activityColor.opacity(0.1), in: Circle())
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(activity.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-                
-                Text(activity.description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-            }
-            
-            Spacer()
-            
-            Text(timeAgoString)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.quaternary, lineWidth: 0.5)
-        )
-    }
-    
-    private var activityIcon: String {
-        switch activity.type {
-        case .speedTest:
-            return "speedometer"
-        case .deviceConnected:
-            return "iphone.and.arrow.forward"
-        case .calibration:
-            return "sensor.tag.radiowaves.forward"
-        case .planChange:
-            return "chart.bar.doc.horizontal"
-        }
-    }
-    
-    private var activityColor: Color {
-        switch activity.type {
-        case .speedTest:
-            return .blue
-        case .deviceConnected:
-            return .green
-        case .calibration:
-            return .purple
-        case .planChange:
-            return .orange
-        }
-    }
-    
-    private var timeAgoString: String {
-        let interval = Date().timeIntervalSince(activity.timestamp)
-        
-        if interval < 3600 {
-            return "\(Int(interval / 60))m ago"
-        } else if interval < 86400 {
-            return "\(Int(interval / 3600))h ago"
-        } else {
-            return "\(Int(interval / 86400))d ago"
         }
     }
 }

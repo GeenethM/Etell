@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+import Firebase
+import FirebaseAuth
+import FirebaseFirestore
 
 struct AccessoriesStoreView: View {
     @StateObject private var telecomAPI = TelecomAPIService()
@@ -1564,10 +1567,57 @@ struct ModernCheckoutView: View {
     private func processPayment() {
         isProcessing = true
         
-        // Simulate payment processing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isProcessing = false
-            showingSuccess = true
+        // Save order to Firebase
+        Task {
+            await saveOrderToFirebase()
+        }
+    }
+    
+    private func saveOrderToFirebase() async {
+        guard let currentUser = Auth.auth().currentUser else {
+            print("❌ No authenticated user found")
+            DispatchQueue.main.async {
+                self.isProcessing = false
+            }
+            return
+        }
+        
+        let billingInfo = BillingInfo(
+            fullName: fullName,
+            email: email,
+            address: address,
+            city: city,
+            zipCode: zipCode
+        )
+        
+        let order = Order(
+            userId: currentUser.uid,
+            items: cartItems,
+            paymentMethod: selectedPaymentMethod.rawValue,
+            billingInfo: billingInfo
+        )
+        
+        do {
+            let db = Firestore.firestore()
+            let orderData = order.toFirestoreData()
+            
+            try await db.collection("users")
+                .document(currentUser.uid)
+                .collection("orders")
+                .document(order.id)
+                .setData(orderData)
+            
+            print("✅ Order saved successfully: \(order.id)")
+            
+            DispatchQueue.main.async {
+                self.isProcessing = false
+                self.showingSuccess = true
+            }
+        } catch {
+            print("❌ Error saving order: \(error.localizedDescription)")
+            DispatchQueue.main.async {
+                self.isProcessing = false
+            }
         }
     }
 }

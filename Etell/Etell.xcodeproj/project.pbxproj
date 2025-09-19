@@ -10,6 +10,8 @@
 		424A2AF02E50920F00662242 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 424A2AEF2E50920F00662242 /* FirebaseAnalytics */; };
 		424A2AF22E50920F00662242 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 424A2AF12E50920F00662242 /* FirebaseAuth */; };
 		424A2AF42E50920F00662242 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 424A2AF32E50920F00662242 /* FirebaseFirestore */; };
+		7EB9E9F02E7D9C3C00A0FC8B /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 7EB9E9EF2E7D9C3C00A0FC8B /* FirebaseMessaging */; };
+		7EB9E9F22E7D9C6300A0FC8B /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 7EB9E9F12E7D9C6300A0FC8B /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,7 +73,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7EB9E9F02E7D9C3C00A0FC8B /* FirebaseMessaging in Frameworks */,
 				424A2AF02E50920F00662242 /* FirebaseAnalytics in Frameworks */,
+				7EB9E9F22E7D9C6300A0FC8B /* FirebaseMessaging in Frameworks */,
 				424A2AF22E50920F00662242 /* FirebaseAuth in Frameworks */,
 				424A2AF42E50920F00662242 /* FirebaseFirestore in Frameworks */,
 			);
@@ -137,6 +141,8 @@
 				424A2AEF2E50920F00662242 /* FirebaseAnalytics */,
 				424A2AF12E50920F00662242 /* FirebaseAuth */,
 				424A2AF32E50920F00662242 /* FirebaseFirestore */,
+				7EB9E9EF2E7D9C3C00A0FC8B /* FirebaseMessaging */,
+				7EB9E9F12E7D9C6300A0FC8B /* FirebaseMessaging */,
 			);
 			productName = Etell;
 			productReference = 424A2A882E504FC800662242 /* Etell.app */;
@@ -619,6 +625,14 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 424A2AEE2E50920F00662242 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
+		};
+		7EB9E9EF2E7D9C3C00A0FC8B /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FirebaseMessaging;
+		};
+		7EB9E9F12E7D9C6300A0FC8B /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -9,7 +9,7 @@ struct SignUpView: View {
     @StateObject private var viewModel = AuthViewModel(authService: FirebaseAuthService(), notificationService: NotificationService())
     
     var isFormValid: Bool {
-        !viewModel.fullName.isEmpty && viewModel.isFormValid && confirmPassword == viewModel.password && viewModel.password.count >= 6
+        !viewModel.fullName.isEmpty && !viewModel.routerNumber.isEmpty && viewModel.isFormValid && confirmPassword == viewModel.password && viewModel.password.count >= 6
     }
     
     var body: some View {
@@ -178,6 +178,16 @@ struct SignUpFormSection: View {
                 icon: "envelope",
                 keyboardType: .emailAddress,
                 autocapitalization: .never
+            )
+            
+            // Router Number Field
+            SignUpTextField(
+                title: "Router Number",
+                text: $viewModel.routerNumber,
+                placeholder: "Enter your router serial number",
+                icon: "wifi.router",
+                keyboardType: .asciiCapable,
+                autocapitalization: .characters
             )
             
             // Password Field
@@ -377,7 +387,9 @@ struct SignUpActionButtons: View {
                         try await authService.signUp(
                             email: viewModel.email,
                             password: viewModel.password,
-                            displayName: viewModel.fullName.isEmpty ? nil : viewModel.fullName
+                            displayName: viewModel.fullName.isEmpty ? nil : viewModel.fullName,
+                            routerNumber: viewModel.routerNumber.isEmpty ? nil : viewModel.routerNumber,
+                            faceIDEnabled: enableFaceID
                         )
                         
                         if authService.isAuthenticated {

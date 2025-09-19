@@ -1,221 +1,467 @@
-//
-//  CustomerSupportView.swift
-//  Etell
-//
-//  Created by Geeneth 013 on 2025-08-16.
-//
-
 import SwiftUI
-import UIKit
+import Firebase
+import FirebaseAuth
+import FirebaseFirestore
 
 struct CustomerSupportView: View {
-    @Environment(\.dismiss) private var dismiss
     @State private var showingFAQ = false
     @State private var showingLiveChat = false
     @State private var showingIssueReport = false
+    @State private var showingAppointmentBooking = false
+    @EnvironmentObject var notificationService: NotificationService
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Support Icon
-                    VStack(spacing: 16) {
-                        Image(systemName: "headphones")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white)
-                            .frame(width: 100, height: 100)
-                            .background(Color.blue.opacity(0.8))
-                            .clipShape(Circle())
-                        
-                        VStack(spacing: 8) {
-                            Text("We're here to help! Choose an option below")
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                                .multilineTextAlignment(.center)
-                            
-                            Text("to get the support you need.")
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    .padding(.top, 20)
-                    
-                    // Support Options
-                    VStack(spacing: 16) {
-                        SupportOptionCard(
-                            icon: "questionmark.circle.fill",
-                            iconColor: .blue,
-                            title: "FAQs",
-                            subtitle: "Browse common questions",
-                            action: {
-                                showingFAQ = true
-                            }
+        NavigationStack {
+            ZStack {
+                // Background Gradient
+                LinearGradient(
+                    colors: [
+                        Color(.systemBackground),
+                        Color(.systemGray6).opacity(0.3)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
+                    LazyVStack(spacing: 24) {
+                        SupportHeroSection()
+                        QuickSupportSection(
+                            showingFAQ: $showingFAQ,
+                            showingLiveChat: $showingLiveChat,
+                            showingIssueReport: $showingIssueReport
                         )
-                        
-                        SupportOptionCard(
-                            icon: "message.circle.fill",
-                            iconColor: .green,
-                            title: "Live Chat",
-                            subtitle: "Chat with our support team",
-                            action: {
-                                showingLiveChat = true
-                            }
-                        )
-                        
-                        SupportOptionCard(
-                            icon: "exclamationmark.triangle.fill",
-                            iconColor: .red,
-                            title: "Report Issue",
-                            subtitle: "Report a technical problem",
-                            action: {
-                                showingIssueReport = true
-                            }
-                        )
+                        BookAppointmentSection(showingAppointmentBooking: $showingAppointmentBooking)
+                        ContactMethodsSection()
                     }
                     .padding(.horizontal, 20)
-                    
-                    // Contact Us Directly
-                    VStack(spacing: 16) {
-                        Text("Contact Us Directly")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .padding(.top, 20)
-                        
-                        HStack(spacing: 16) {
-                            ContactDirectButton(
-                                icon: "phone.fill",
-                                title: "Call Us",
-                                subtitle: "1800 ETELL 24",
-                                color: .blue,
-                                action: {
-                                    if let url = URL(string: "tel:1800ETELL24") {
-                                        UIApplication.shared.open(url)
-                                    }
-                                }
-                            )
-                            
-                            ContactDirectButton(
-                                icon: "envelope.fill",
-                                title: "Email",
-                                subtitle: "support@etell.com",
-                                color: .orange,
-                                action: {
-                                    if let url = URL(string: "mailto:support@etell.com") {
-                                        UIApplication.shared.open(url)
-                                    }
-                                }
-                            )
-                        }
-                        .padding(.horizontal, 20)
-                    }
+                    .padding(.bottom, 40)
                 }
-                .padding(.bottom, 30)
             }
-            .navigationTitle("Customer Support")
+            .navigationTitle("Support")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
+            .sheet(isPresented: $showingFAQ) {
+                ModernFAQView()
             }
-        }
-        .sheet(isPresented: $showingFAQ) {
-            FAQView()
-        }
-        .sheet(isPresented: $showingLiveChat) {
-            LiveChatView()
-        }
-        .sheet(isPresented: $showingIssueReport) {
-            IssueReportView()
+            .sheet(isPresented: $showingLiveChat) {
+                ModernLiveChatView()
+            }
+            .sheet(isPresented: $showingIssueReport) {
+                ModernIssueReportView()
+            }
+            .sheet(isPresented: $showingAppointmentBooking) {
+                AppointmentBookingView()
+                    .environmentObject(notificationService)
+            }
         }
     }
 }
 
-// MARK: - Support Components
+// MARK: - Support Hero Section
 
-struct SupportOptionCard: View {
+struct SupportHeroSection: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            // Gradient Hero Icon
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue, .cyan],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 80, height: 80)
+                
+                Image(systemName: "headphones")
+                    .font(.system(size: 36, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+            .shadow(color: .blue.opacity(0.3), radius: 20, x: 0, y: 10)
+            
+            VStack(spacing: 8) {
+                Text("How can we help you?")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                
+                Text("Our support team is here to assist you 24/7")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(.top, 20)
+    }
+}
+
+// MARK: - Quick Support Section
+
+struct QuickSupportSection: View {
+    @Binding var showingFAQ: Bool
+    @Binding var showingLiveChat: Bool
+    @Binding var showingIssueReport: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Quick Support")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.primary)
+            
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 16) {
+                // FAQ Card
+                SupportActionCard(
+                    icon: "questionmark.circle.fill",
+                    title: "FAQ",
+                    subtitle: "Find quick answers",
+                    gradientColors: [.blue, .purple],
+                    badge: "Popular"
+                ) {
+                    showingFAQ = true
+                }
+                
+                // Live Chat Card
+                SupportActionCard(
+                    icon: "message.fill",
+                    title: "Live Chat",
+                    subtitle: "Chat with support",
+                    gradientColors: [.green, .mint],
+                    badge: "24/7"
+                ) {
+                    showingLiveChat = true
+                }
+                
+                // Report Issue Card
+                SupportActionCard(
+                    icon: "exclamationmark.triangle.fill",
+                    title: "Report Issue",
+                    subtitle: "Submit a problem",
+                    gradientColors: [.orange, .red]
+                ) {
+                    showingIssueReport = true
+                }
+                
+                // Call Support Card
+                SupportActionCard(
+                    icon: "phone.fill",
+                    title: "Call Support",
+                    subtitle: "Speak with an expert",
+                    gradientColors: [.indigo, .blue]
+                ) {
+                    if let phoneURL = URL(string: "tel:+1234567890") {
+                        UIApplication.shared.open(phoneURL)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct SupportActionCard: View {
     let icon: String
-    let iconColor: Color
     let title: String
     let subtitle: String
+    let gradientColors: [Color]
+    let badge: String?
+    let action: () -> Void
+    
+    init(
+        icon: String,
+        title: String,
+        subtitle: String,
+        gradientColors: [Color],
+        badge: String? = nil,
+        action: @escaping () -> Void
+    ) {
+        self.icon = icon
+        self.title = title
+        self.subtitle = subtitle
+        self.gradientColors = gradientColors
+        self.badge = badge
+        self.action = action
+    }
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                ZStack(alignment: .topTrailing) {
+                    VStack(spacing: 8) {
+                        // Gradient Icon
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: gradientColors,
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 44, height: 44)
+                            
+                            Image(systemName: icon)
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        
+                        VStack(spacing: 4) {
+                            Text(title)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            
+                            Text(subtitle)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    
+                    // Badge
+                    if let badge = badge {
+                        Text(badge)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.red, in: Capsule())
+                            .offset(x: 8, y: -8)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(16)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(.quaternary, lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Book Appointment Section
+
+struct BookAppointmentSection: View {
+    @Binding var showingAppointmentBooking: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Book an Appointment")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.primary)
+            
+            AppointmentCard(showingAppointmentBooking: $showingAppointmentBooking)
+        }
+    }
+}
+
+struct AppointmentCard: View {
+    @Binding var showingAppointmentBooking: Bool
+    
+    var body: some View {
+        Button(action: { showingAppointmentBooking = true }) {
+            VStack(spacing: 16) {
+                // Header with gradient icon
+                HStack(spacing: 16) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.teal, .blue],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 60, height: 60)
+                        
+                        Image(systemName: "calendar.badge.plus")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Schedule a Consultation")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        Text("Get personalized support from our experts")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                
+                // Features
+                VStack(spacing: 12) {
+                    AppointmentFeature(
+                        icon: "person.2.fill",
+                        title: "One-on-One Support",
+                        description: "Dedicated technician assistance"
+                    )
+                    
+                    AppointmentFeature(
+                        icon: "video.fill",
+                        title: "Virtual or In-Person",
+                        description: "Choose your preferred meeting style"
+                    )
+                    
+                    AppointmentFeature(
+                        icon: "clock.fill",
+                        title: "Flexible Scheduling",
+                        description: "Book at your convenience"
+                    )
+                }
+            }
+            .padding(20)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(.quaternary, lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct AppointmentFeature: View {
+    let icon: String
+    let title: String
+    let description: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.teal)
+                .frame(width: 20)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Text(description)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+// MARK: - Contact Methods Section
+
+struct ContactMethodsSection: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Contact Methods")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.primary)
+            
+            VStack(spacing: 12) {
+                // Phone Contact
+                ContactMethodCard(
+                    icon: "phone.fill",
+                    title: "Phone Support",
+                    subtitle: "+1 (555) 123-4567",
+                    description: "Available 24/7 for urgent issues",
+                    gradientColors: [.blue, .cyan]
+                ) {
+                    if let phoneURL = URL(string: "tel:+15551234567") {
+                        UIApplication.shared.open(phoneURL)
+                    }
+                }
+                
+                // Email Contact
+                ContactMethodCard(
+                    icon: "envelope.fill",
+                    title: "Email Support",
+                    subtitle: "support@etell.com",
+                    description: "Response within 24 hours",
+                    gradientColors: [.purple, .pink]
+                ) {
+                    if let emailURL = URL(string: "mailto:support@etell.com") {
+                        UIApplication.shared.open(emailURL)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct ContactMethodCard: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let description: String
+    let gradientColors: [Color]
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundColor(iconColor)
-                    .frame(width: 40, height: 40)
+                // Gradient Icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: gradientColors,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     
                     Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Text(description)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                
-                Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.tertiary)
             }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            .padding(16)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(.quaternary, lineWidth: 0.5)
+            )
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
     }
 }
 
-struct ContactDirectButton: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let color: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundColor(.white)
-                    .frame(width: 50, height: 50)
-                    .background(color)
-                    .clipShape(Circle())
-                
-                VStack(spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
+// MARK: - Modern Support Views
 
-// MARK: - Support Views
-
-struct FAQView: View {
+struct ModernFAQView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
     @State private var expandedItems = Set<UUID>()
@@ -233,42 +479,43 @@ struct FAQView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
-                // Search Bar
-                HStack {
+            VStack(spacing: 0) {
+                // Modern Search Bar
+                HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.secondary)
                     
                     TextField("Search FAQs...", text: $searchText)
-                        .textFieldStyle(PlainTextFieldStyle())
+                        .font(.system(size: 16))
+                        .textFieldStyle(.plain)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(10)
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.quinary, in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
                 
-                // FAQ List
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(filteredFAQs) { faq in
-                            FAQItem(
+                            ModernFAQCard(
                                 faq: faq,
-                                isExpanded: expandedItems.contains(faq.id),
-                                onTap: {
+                                isExpanded: expandedItems.contains(faq.id)
+                            ) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
                                     if expandedItems.contains(faq.id) {
                                         expandedItems.remove(faq.id)
                                     } else {
                                         expandedItems.insert(faq.id)
                                     }
                                 }
-                            )
+                            }
                         }
                     }
-                    .padding()
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
                 }
-                
-                Spacer()
             }
             .navigationTitle("Frequently Asked Questions")
             .navigationBarTitleDisplayMode(.large)
@@ -283,90 +530,104 @@ struct FAQView: View {
     }
 }
 
-struct FAQItem: View {
+struct ModernFAQCard: View {
     let faq: FAQ
     let isExpanded: Bool
     let onTap: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(spacing: 0) {
+            // Question Header
             Button(action: onTap) {
-                HStack {
+                HStack(spacing: 12) {
                     Text(faq.question)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
-                    
-                    Spacer()
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 0 : 0))
+                        .animation(.easeInOut(duration: 0.2), value: isExpanded)
                 }
-                .padding()
-                .background(Color(.systemBackground))
+                .padding(16)
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.plain)
             
+            // Answer Content
             if isExpanded {
-                Text(faq.answer)
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
+                VStack(alignment: .leading, spacing: 0) {
+                    Divider()
+                        .padding(.horizontal, 16)
+                    
+                    Text(faq.answer)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .cornerRadius(10)
-        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(.quaternary, lineWidth: 0.5)
+        )
+        .animation(.easeInOut(duration: 0.3), value: isExpanded)
     }
 }
 
-struct LiveChatView: View {
+struct ModernLiveChatView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var messageText = ""
-    @State private var messages: [ChatMessage] = [
-        ChatMessage(content: "Hello! How can I help you today?", isFromUser: false, timestamp: Date())
-    ]
+    @State private var messages: [SupportChatMessage] = SupportChatMessage.mockMessages
     
     var body: some View {
         NavigationView {
-            VStack {
-                ScrollViewReader { scrollViewReader in
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(messages) { message in
-                                ChatBubble(message: message)
-                                    .id(message.id)
-                            }
-                        }
-                        .padding()
-                    }
-                    .onChange(of: messages.count) { oldValue, newValue in
-                        if let lastMessage = messages.last {
-                            withAnimation {
-                                scrollViewReader.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
+            VStack(spacing: 0) {
+                // Chat Messages
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(messages) { message in
+                            ChatMessageRow(message: message)
                         }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
                 }
+                .background(Color(.systemGray6))
                 
                 // Message Input
-                HStack {
-                    TextField("Type your message...", text: $messageText)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                HStack(spacing: 12) {
+                    TextField("Type your message...", text: $messageText, axis: .vertical)
+                        .font(.system(size: 16))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(.quinary, in: RoundedRectangle(cornerRadius: 20))
+                        .lineLimit(1...4)
                     
-                    Button("Send") {
-                        sendMessage()
+                    Button(action: sendMessage) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(.blue, in: Circle())
                     }
-                    .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(messageText.isEmpty)
                 }
-                .padding()
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(.regularMaterial)
             }
             .navigationTitle("Live Chat")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Close") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
                         dismiss()
                     }
                 }
@@ -375,59 +636,64 @@ struct LiveChatView: View {
     }
     
     private func sendMessage() {
-        let trimmedMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedMessage.isEmpty else { return }
+        guard !messageText.isEmpty else { return }
         
-        let userMessage = ChatMessage(content: trimmedMessage, isFromUser: true, timestamp: Date())
-        messages.append(userMessage)
+        let newMessage = SupportChatMessage(
+            id: UUID(),
+            text: messageText,
+            isFromUser: true,
+            timestamp: Date()
+        )
+        
+        messages.append(newMessage)
         messageText = ""
         
         // Simulate response
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            let response = generateResponse(to: trimmedMessage)
-            let botMessage = ChatMessage(content: response, isFromUser: false, timestamp: Date())
-            messages.append(botMessage)
+            let response = SupportChatMessage(
+                id: UUID(),
+                text: "Thank you for your message. Our support team will assist you shortly.",
+                isFromUser: false,
+                timestamp: Date()
+            )
+            messages.append(response)
         }
-    }
-    
-    private func generateResponse(to message: String) -> String {
-        let responses = [
-            "Thank you for contacting us. I'm looking into your query.",
-            "I understand your concern. Let me help you with that.",
-            "That's a great question! Here's what I can tell you...",
-            "I'm connecting you with a specialist who can better assist you.",
-            "Thank you for your patience. I'll have an answer for you shortly."
-        ]
-        return responses.randomElement() ?? "Thank you for your message."
     }
 }
 
-struct ChatBubble: View {
-    let message: ChatMessage
+struct ChatMessageRow: View {
+    let message: SupportChatMessage
     
     var body: some View {
         HStack {
             if message.isFromUser {
                 Spacer(minLength: 60)
                 
-                Text(message.content)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(16)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(message.text)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.blue, in: RoundedRectangle(cornerRadius: 16))
+                    
+                    Text(message.timestamp, style: .time)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Support Agent")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Text(message.text)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
                     
-                    Text(message.content)
-                        .padding()
-                        .background(Color.gray.opacity(0.2))
-                        .foregroundColor(.primary)
-                        .cornerRadius(16)
+                    Text(message.timestamp, style: .time)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity * 0.7, alignment: .leading)
                 
                 Spacer(minLength: 60)
             }
@@ -435,80 +701,90 @@ struct ChatBubble: View {
     }
 }
 
-struct IssueReportView: View {
+struct ModernIssueReportView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var issueType = "Technical Issue"
-    @State private var priority = "Medium"
-    @State private var contactName = ""
-    @State private var contactEmail = ""
+    @State private var issueTitle = ""
     @State private var issueDescription = ""
+    @State private var selectedCategory = "Technical Issue"
+    @State private var includeDeviceInfo = true
     @State private var isSubmitting = false
-    @State private var showingSuccess = false
     
-    let issueTypes = ["Technical Issue", "Billing Problem", "Service Outage", "Account Issue", "Feature Request"]
-    let priorities = ["Low", "Medium", "High", "Critical"]
+    private let db = Firestore.firestore()
+    
+    private let categories = [
+        "Technical Issue",
+        "Billing Question",
+        "Service Outage",
+        "Feature Request",
+        "Account Access",
+        "Other"
+    ]
     
     var body: some View {
         NavigationView {
             Form {
-                Section("Issue Details") {
-                    Picker("Issue Type", selection: $issueType) {
-                        ForEach(issueTypes, id: \.self) { type in
-                            Text(type).tag(type)
+                Section {
+                    Picker("Category", selection: $selectedCategory) {
+                        ForEach(categories, id: \.self) { category in
+                            Text(category).tag(category)
                         }
                     }
-                    
-                    Picker("Priority", selection: $priority) {
-                        ForEach(priorities, id: \.self) { priority in
-                            Text(priority).tag(priority)
-                        }
-                    }
-                }
-                
-                Section("Contact Information") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Name")
-                            .font(.headline)
-                        
-                        TextField("Your full name", text: $contactName)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Contact Email")
-                            .font(.headline)
-                        
-                        TextField("your.email@example.com", text: $contactEmail)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .keyboardType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Issue Description")
-                            .font(.headline)
-                        
-                        TextEditor(text: $issueDescription)
-                            .frame(minHeight: 100)
-                            .padding(4)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                    }
+                    .pickerStyle(.menu)
+                } header: {
+                    Text("Issue Category")
                 }
                 
                 Section {
-                    Button(action: submitReport) {
+                    TextField("Brief description of the issue", text: $issueTitle)
+                        .font(.system(size: 16))
+                } header: {
+                    Text("Issue Title")
+                }
+                
+                Section {
+                    TextField("Please describe your issue in detail...", text: $issueDescription, axis: .vertical)
+                        .font(.system(size: 16))
+                        .lineLimit(5...10)
+                } header: {
+                    Text("Description")
+                }
+                
+                Section {
+                    Toggle("Include device information", isOn: $includeDeviceInfo)
+                        .font(.system(size: 16))
+                } header: {
+                    Text("Additional Information")
+                } footer: {
+                    Text("This helps our support team diagnose technical issues faster")
+                }
+                
+                Section {
+                    Button(action: {
+                        Task {
+                            await submitReport()
+                        }
+                    }) {
                         HStack {
+                            Spacer()
                             if isSubmitting {
                                 ProgressView()
-                                    .scaleEffect(0.8)
+                                    .scaleEffect(0.9)
+                                    .tint(.white)
+                                Text("Submitting...")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            } else {
+                                Text("Submit Report")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(.white)
                             }
-                            
-                            Text(isSubmitting ? "Submitting..." : "Submit Report")
+                            Spacer()
                         }
-                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.blue, in: RoundedRectangle(cornerRadius: 10))
                     }
-                    .disabled(isSubmitting || contactName.isEmpty || contactEmail.isEmpty || issueDescription.isEmpty)
+                    .buttonStyle(.plain)
+                    .disabled(issueTitle.isEmpty || issueDescription.isEmpty || isSubmitting)
                 }
             }
             .navigationTitle("Report Issue")
@@ -520,34 +796,378 @@ struct IssueReportView: View {
                     }
                 }
             }
-            .alert("Report Submitted", isPresented: $showingSuccess) {
+        }
+    }
+    
+    private func submitReport() async {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("❌ No authenticated user found - cannot submit issue report")
+            return
+        }
+        
+        isSubmitting = true
+        
+        do {
+            let reportData: [String: Any] = [
+                "id": UUID().uuidString,
+                "title": issueTitle,
+                "description": issueDescription,
+                "category": selectedCategory,
+                "includeDeviceInfo": includeDeviceInfo,
+                "status": "Open",
+                "priority": "Medium",
+                "submittedAt": Timestamp(),
+                "userId": userId
+            ]
+            
+            print("📋 Submitting issue report for user: \(userId)")
+            print("📋 Report data: \(reportData)")
+            
+            try await db.collection("users")
+                .document(userId)
+                .collection("supportReports")
+                .addDocument(data: reportData)
+            
+            print("✅ Issue report submitted successfully")
+            
+            await MainActor.run {
+                isSubmitting = false
+                dismiss()
+            }
+            
+        } catch {
+            print("❌ Error submitting issue report: \(error.localizedDescription)")
+            await MainActor.run {
+                isSubmitting = false
+                // You could show an error alert here
+            }
+        }
+    }
+}
+
+struct AppointmentBookingView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var notificationService: NotificationService
+    @State private var selectedAppointmentType = "Technical Support"
+    @State private var selectedMeetingStyle = "Virtual"
+    @State private var selectedDate = Date()
+    @State private var selectedTime = Date()
+    @State private var customerName = ""
+    @State private var customerEmail = ""
+    @State private var customerPhone = ""
+    @State private var appointmentNotes = ""
+    @State private var isSubmitting = false
+    @State private var showingSuccess = false
+    
+    private let db = Firestore.firestore()
+    
+    private let appointmentTypes = [
+        "Technical Support",
+        "Network Optimization",
+        "Device Setup",
+        "Signal Analysis",
+        "Billing Consultation",
+        "General Consultation"
+    ]
+    
+    private let meetingStyles = ["Virtual", "In-Person"]
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                // Appointment Type Section
+                Section {
+                    Picker("Service Type", selection: $selectedAppointmentType) {
+                        ForEach(appointmentTypes, id: \.self) { type in
+                            Text(type).tag(type)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                } header: {
+                    Text("Appointment Type")
+                } footer: {
+                    Text("Select the type of support you need")
+                }
+                
+                // Meeting Style Section
+                Section {
+                    Picker("Meeting Style", selection: $selectedMeetingStyle) {
+                        ForEach(meetingStyles, id: \.self) { style in
+                            HStack {
+                                Image(systemName: style == "Virtual" ? "video.fill" : "location.fill")
+                                    .foregroundStyle(style == "Virtual" ? .blue : .green)
+                                Text(style)
+                            }
+                            .tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Meeting Preference")
+                } footer: {
+                    Text(selectedMeetingStyle == "Virtual" ? "We'll send you a video call link" : "Meeting at our service center or your location")
+                }
+                
+                // Date & Time Section
+                Section {
+                    DatePicker(
+                        "Preferred Date",
+                        selection: $selectedDate,
+                        in: Date()...,
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.compact)
+                    
+                    DatePicker(
+                        "Preferred Time",
+                        selection: $selectedTime,
+                        displayedComponents: .hourAndMinute
+                    )
+                    .datePickerStyle(.wheel)
+                } header: {
+                    Text("Schedule")
+                } footer: {
+                    Text("Select your preferred date and time. All times are in your local timezone.")
+                }
+                
+                // Contact Information Section
+                Section {
+                    TextField("Full Name", text: $customerName)
+                        .font(.system(size: 16))
+                    
+                    TextField("Email Address", text: $customerEmail)
+                        .font(.system(size: 16))
+                        .keyboardType(.emailAddress)
+                        .textContentType(.emailAddress)
+                    
+                    TextField("Phone Number", text: $customerPhone)
+                        .font(.system(size: 16))
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
+                } header: {
+                    Text("Contact Information")
+                } footer: {
+                    Text("We'll use this information to confirm your appointment")
+                }
+                
+                // Additional Notes Section
+                Section {
+                    TextField(
+                        "Describe your issue or what you'd like help with...",
+                        text: $appointmentNotes,
+                        axis: .vertical
+                    )
+                    .font(.system(size: 16))
+                    .lineLimit(3...6)
+                } header: {
+                    Text("Additional Notes (Optional)")
+                } footer: {
+                    Text("Help us prepare for your appointment")
+                }
+                
+                // Booking Summary
+                Section {
+                    VStack(spacing: 12) {
+                        AppointmentSummaryRow(
+                            icon: "briefcase.fill",
+                            title: "Service",
+                            value: selectedAppointmentType
+                        )
+                        
+                        AppointmentSummaryRow(
+                            icon: selectedMeetingStyle == "Virtual" ? "video.fill" : "location.fill",
+                            title: "Meeting Style",
+                            value: selectedMeetingStyle
+                        )
+                        
+                        AppointmentSummaryRow(
+                            icon: "calendar",
+                            title: "Date & Time",
+                            value: "\(selectedDate.formatted(date: .abbreviated, time: .omitted)) at \(selectedTime.formatted(date: .omitted, time: .shortened))"
+                        )
+                    }
+                } header: {
+                    Text("Appointment Summary")
+                }
+                
+                // Book Button Section
+                Section {
+                    Button(action: bookAppointment) {
+                        HStack {
+                            if isSubmitting {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            }
+                            
+                            Spacer()
+                            Text(isSubmitting ? "Booking..." : "Book Appointment")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                        .background(.teal, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSubmitting || customerName.isEmpty || customerEmail.isEmpty || customerPhone.isEmpty)
+                }
+            }
+            .navigationTitle("Book Appointment")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .alert("Appointment Booked!", isPresented: $showingSuccess) {
                 Button("OK") {
                     dismiss()
                 }
             } message: {
-                Text("Your issue report has been submitted successfully. We'll get back to you within 24 hours.")
+                Text("Your appointment has been scheduled. You'll receive a confirmation email shortly.")
             }
         }
     }
     
-    private func submitReport() {
+    private func bookAppointment() {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("❌ No authenticated user found - cannot book appointment")
+            return
+        }
+        
         isSubmitting = true
         
-        // Simulate form submission
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isSubmitting = false
-            showingSuccess = true
+        Task {
+            do {
+                // Combine date and time for the full appointment datetime
+                let calendar = Calendar.current
+                let dateComponents = calendar.dateComponents([.year, .month, .day], from: selectedDate)
+                let timeComponents = calendar.dateComponents([.hour, .minute], from: selectedTime)
+                
+                var fullDateComponents = DateComponents()
+                fullDateComponents.year = dateComponents.year
+                fullDateComponents.month = dateComponents.month
+                fullDateComponents.day = dateComponents.day
+                fullDateComponents.hour = timeComponents.hour
+                fullDateComponents.minute = timeComponents.minute
+                
+                guard let appointmentDateTime = calendar.date(from: fullDateComponents) else {
+                    print("❌ Failed to create appointment datetime")
+                    await MainActor.run {
+                        isSubmitting = false
+                    }
+                    return
+                }
+                
+                let appointmentId = UUID().uuidString
+                let appointmentData: [String: Any] = [
+                    "id": appointmentId,
+                    "appointmentType": selectedAppointmentType,
+                    "meetingStyle": selectedMeetingStyle,
+                    "appointmentDateTime": appointmentDateTime,
+                    "customerName": customerName,
+                    "customerEmail": customerEmail,
+                    "customerPhone": customerPhone,
+                    "notes": appointmentNotes,
+                    "status": "Scheduled",
+                    "bookedAt": Timestamp(),
+                    "userId": userId,
+                    "notificationScheduled": true
+                ]
+                
+                print("📅 Booking appointment for user: \(userId)")
+                print("📅 Appointment datetime: \(appointmentDateTime)")
+                print("📅 Appointment data: \(appointmentData)")
+                
+                // Save to Firestore
+                try await db.collection("users")
+                    .document(userId)
+                    .collection("appointments")
+                    .document(appointmentId)
+                    .setData(appointmentData)
+                
+                // Schedule local notifications using NotificationService
+                notificationService.scheduleAppointmentReminder(
+                    appointmentId: appointmentId,
+                    appointmentDateTime: appointmentDateTime,
+                    appointmentType: selectedAppointmentType
+                )
+                
+                print("✅ Appointment booked successfully with local notifications scheduled")
+                
+                await MainActor.run {
+                    isSubmitting = false
+                    showingSuccess = true
+                }
+                
+            } catch {
+                print("❌ Error booking appointment: \(error.localizedDescription)")
+                await MainActor.run {
+                    isSubmitting = false
+                    // You could show an error alert here
+                }
+            }
+        }
+    }
+}
+
+struct AppointmentSummaryRow: View {
+    let icon: String
+    let title: String
+    let value: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.teal)
+                .frame(width: 20)
+            
+            Text(title)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.secondary)
+            
+            Spacer()
+            
+            Text(value)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.trailing)
         }
     }
 }
 
 // MARK: - Data Models
 
-struct ChatMessage: Identifiable {
-    let id = UUID()
-    let content: String
+struct SupportChatMessage: Identifiable {
+    let id: UUID
+    let text: String
     let isFromUser: Bool
     let timestamp: Date
+    
+    static let mockMessages = [
+        SupportChatMessage(
+            id: UUID(),
+            text: "Hello! How can I help you today?",
+            isFromUser: false,
+            timestamp: Date().addingTimeInterval(-300)
+        ),
+        SupportChatMessage(
+            id: UUID(),
+            text: "Hi, I'm having trouble with my signal strength",
+            isFromUser: true,
+            timestamp: Date().addingTimeInterval(-240)
+        ),
+        SupportChatMessage(
+            id: UUID(),
+            text: "I'd be happy to help you with signal issues. Can you tell me your current location?",
+            isFromUser: false,
+            timestamp: Date().addingTimeInterval(-180)
+        )
+    ]
 }
 
 #Preview {

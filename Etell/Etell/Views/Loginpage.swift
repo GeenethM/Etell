@@ -290,13 +290,13 @@ struct LoginBiometricToggle: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: notificationService.biometryType == .faceID ? "faceid" : "touchid")
+            Image(systemName: "faceid")
                 .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(.blue)
                 .frame(width: 24, height: 24)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text("Enable \(notificationService.biometryType == .faceID ? "Face ID" : "Touch ID")")
+                Text("Enable Face ID")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.primary)
                 
@@ -331,10 +331,10 @@ struct LoginBiometricButton: View {
             }
         }) {
             HStack(spacing: 12) {
-                Image(systemName: notificationService.biometryType == .faceID ? "faceid" : "touchid")
+                Image(systemName: "faceid")
                     .font(.system(size: 20, weight: .medium))
                 
-                Text("Sign in with \(notificationService.biometryType == .faceID ? "Face ID" : "Touch ID")")
+                Text("Sign in with Face ID")
                     .font(.system(size: 16, weight: .semibold))
             }
             .foregroundStyle(.blue)

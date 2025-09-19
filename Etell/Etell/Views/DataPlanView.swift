@@ -6,6 +6,13 @@
 //
 
 import SwiftUI
+import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
+// TODO: Uncomment when Firebase is properly configured
+import Firebase
+import FirebaseFirestore
 
 struct DataPlanView: View {
     @State private var selectedPlan: DataPlan?
@@ -17,6 +24,14 @@ struct DataPlanView: View {
     @State private var currentPlanId: String = "1"
     @Environment(\.dismiss) private var dismiss
     
+    // MARK: - Firestore Data
+    @State private var plans: [DataPlan] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var hasLoadedOnce = false
+    
+    // COMMENTED OUT: Original hardcoded plans data - now fetched from Firestore "dataplans" collection
+    /*
     @State private var plans = [
         DataPlan(id: "1", name: "Home 100GB", provider: "Etell", speed: "50 Mbps", dataLimit: "100 GB", price: 1499, features: ["Free router included", "24/7 customer support", "Unlimited night browsing"], isPopular: false),
         DataPlan(id: "2", name: "Basic", provider: "Etell", speed: "25 Mbps", dataLimit: "40 GB", price: 499, features: ["No contract", "Email support"], isPopular: false),
@@ -34,6 +49,7 @@ struct DataPlanView: View {
         DataPlan(id: "14", name: "Mobile Hotspot", provider: "Etell", speed: "60 Mbps", dataLimit: "150 GB", price: 1299, features: ["Portable router", "Multi-device sharing", "Travel-friendly", "No installation"], isPopular: false),
         DataPlan(id: "15", name: "Night Owl", provider: "Etell", speed: "45 Mbps", dataLimit: "Unlimited", price: 1599, features: ["Unlimited night data", "Peak hour limits", "Perfect for downloads", "Late night streaming"], isPopular: false)
     ]
+    */
     
     enum SortOption: String, CaseIterable {
         case price = "Price"
@@ -70,6 +86,7 @@ struct DataPlanView: View {
     }
     
     var filteredAndSortedPlans: [DataPlan] {
+        print("🔄 Computing filteredAndSortedPlans with \(plans.count) plans")
         let filtered = filterPlans(plans)
         return sortPlans(filtered)
     }
@@ -117,22 +134,77 @@ struct DataPlanView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 20) {
-                    // Header Section
-                    EnhancedHeaderSection(planCount: filteredAndSortedPlans.count)
+            if isLoading {
+                // Loading State
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .progressViewStyle(CircularProgressViewStyle(tint: .blue))
                     
-                    // Filter and Sort Section
-                    EnhancedFilterSortSection(
-                        sortOption: $sortOption,
-                        filterOption: $filterOption,
-                        showingFilters: $showingFilters
-                    )
+                    Text("Loading Data Plans...")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.gray.opacity(0.1))
+                .navigationTitle("Data Plans")
+            } else if let errorMessage = errorMessage {
+                // Error State
+                VStack(spacing: 20) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 50))
+                        .foregroundColor(.orange)
                     
-                    // Plan Cards
-                    ForEach(filteredAndSortedPlans) { plan in
-                        ModernPlanCard(
-                            plan: plan,
+                    Text("Oops! Something went wrong")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    
+                    Text(errorMessage)
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Button {
+                        hasLoadedOnce = false // Allow refresh
+                        fetchDataPlans()
+                    } label: {
+                        Text("Try Again")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(width: 200, height: 50)
+                            .background(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 25))
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.gray.opacity(0.1))
+                .navigationTitle("Data Plans")
+                .navigationBarTitleDisplayMode(.large)
+            } else {
+                // Main Content
+                ScrollView {
+                    LazyVStack(spacing: 20) {
+                        // Header Section
+                        EnhancedHeaderSection(planCount: filteredAndSortedPlans.count)
+                        
+                        // Filter and Sort Section
+                        EnhancedFilterSortSection(
+                            sortOption: $sortOption,
+                            filterOption: $filterOption,
+                            showingFilters: $showingFilters
+                        )
+                        
+                        // Plan Cards
+                        ForEach(filteredAndSortedPlans) { plan in
+                            ModernPlanCard(
+                                plan: plan,
                             isCurrentPlan: plan.id == currentPlanId
                         ) {
                             handlePlanSelection(plan)
@@ -140,15 +212,28 @@ struct DataPlanView: View {
                         .transition(.scale(scale: 0.9).combined(with: .opacity))
                     }
                     
+                    // Debug info
+                    if plans.isEmpty && !isLoading {
+                        Text("No plans available - Debug: plans.count = \(plans.count)")
+                            .foregroundColor(.red)
+                            .padding()
+                    }
+                    
                     Spacer(minLength: 100)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.gray.opacity(0.1))
             .navigationTitle("Data Plans")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
+            .onAppear {
+                print("👁️ DataPlanView onAppear called")
+                fetchDataPlans()
+            }
+            } // End of main content else block
+        }
+        .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         dismiss()
@@ -187,7 +272,6 @@ struct DataPlanView: View {
                 }
             }
         }
-    }
     
     private func handlePlanSelection(_ plan: DataPlan) {
         if plan.id != currentPlanId {
@@ -199,6 +283,78 @@ struct DataPlanView: View {
             selectedPlan = plan
             showingPlanDetails = true
         }
+    }
+    
+    // MARK: - Data Fetching (Firebase Integration)
+    private func fetchDataPlans() {
+        // Prevent multiple simultaneous calls
+        if isLoading {
+            print("⚠️ Already loading data, skipping duplicate call")
+            return
+        }
+        
+        // Only fetch data once unless it's a manual refresh
+        if hasLoadedOnce && !plans.isEmpty {
+            print("✅ Data already loaded, skipping fetch")
+            return
+        }
+        
+        print("🔄 Starting Firebase fetchDataPlans...")
+        isLoading = true
+        errorMessage = nil
+        
+        // TODO: Uncomment when Firebase is properly configured
+        
+        let db = Firestore.firestore()
+        
+        db.collection("dataplans")
+            .order(by: "order", descending: false)
+            .getDocuments { [self] snapshot, error in
+                DispatchQueue.main.async {
+                    print("📡 Firebase response received")
+                    self.isLoading = false
+                    
+                    if let error = error {
+                        print("❌ Firebase error: \(error.localizedDescription)")
+                        self.errorMessage = "Failed to load plans: \(error.localizedDescription)"
+                        self.plans = []
+                        return
+                    }
+                    
+                    guard let documents = snapshot?.documents else {
+                        print("⚠️ No documents found in Firestore")
+                        self.errorMessage = "No data plans found in database"
+                        self.plans = []
+                        return
+                    }
+                    
+                    print("📊 Found \(documents.count) documents in Firestore")
+                    
+                    self.plans = documents.compactMap { document in
+                        let data = document.data()
+                        print("🔍 Processing document: \(document.documentID)")
+                        print("📄 Document data: \(data)")
+                        
+                        let plan = DataPlan(
+                            id: document.documentID,
+                            name: data["name"] as? String ?? "",
+                            provider: data["provider"] as? String ?? "Etell",
+                            speed: data["speed"] as? String ?? "",
+                            dataLimit: data["dataLimit"] as? String ?? "",
+                            price: data["price"] as? Double ?? 0.0,
+                            features: data["features"] as? [String] ?? [],
+                            isPopular: data["isPopular"] as? Bool ?? false
+                        )
+                        
+                        print("✨ Created plan: \(plan.name) - \(plan.price)")
+                        return plan
+                    }
+                    
+                    print("✅ Successfully loaded \(self.plans.count) plans from Firebase")
+                    self.errorMessage = nil
+                    self.hasLoadedOnce = true
+                }
+            }
     }
 }
 
@@ -495,7 +651,7 @@ struct ModernPlanDetailView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 32)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.gray.opacity(0.1))
             .navigationTitle(plan.name)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -997,15 +1153,14 @@ struct AddNewPlanView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Plan Details") {
+                Section(header: Text("Plan Details")) {
                     TextField("Plan Name", text: $planName)
                     TextField("Speed (e.g., 100 Mbps)", text: $planSpeed)
                     TextField("Data Limit (e.g., 200 GB)", text: $planDataLimit)
                     TextField("Price (LKR)", text: $planPrice)
-                        .keyboardType(.decimalPad)
                 }
                 
-                Section("Features") {
+                Section(header: Text("Features")) {
                     ForEach(planFeatures.indices, id: \.self) { index in
                         HStack {
                             Text(planFeatures[index])
@@ -1029,7 +1184,7 @@ struct AddNewPlanView: View {
                     }
                 }
                 
-                Section("Options") {
+                Section(header: Text("Options")) {
                     Toggle("Mark as Popular", isOn: $isPopular)
                 }
                 

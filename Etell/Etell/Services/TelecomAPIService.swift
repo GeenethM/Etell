@@ -7,6 +7,8 @@
 
 import Foundation
 import Combine
+import Firebase
+import FirebaseFirestore
 
 // MARK: - API Response Models
 struct TelecomAPIResponse: Codable {
@@ -96,47 +98,97 @@ class TelecomAPIService: ObservableObject {
     
     private let session = URLSession.shared
     private var cancellables = Set<AnyCancellable>()
+    private let db = Firestore.firestore()
     
     // API Endpoints (These would be real endpoints in production)
     private let endpoints = TelecomEndpoints()
     
     func fetchAllProducts() async {
-        isLoading = true
-        errorMessage = nil
-        
-        // For demo purposes, use realistic mock data with working image URLs
-        // In production, uncomment the API calls below:
-        /*
-        // Fetch from multiple suppliers concurrently
-        async let asusProducts = fetchASUSProducts()
-        async let netgearProducts = fetchNetgearProducts()
-        async let tplinkProducts = fetchTPLinkProducts()
-        async let ubiquitiProducts = fetchUbiquitiProducts()
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
         
         do {
-            let (asus, netgear, tplink, ubiquiti) = try await (asusProducts, netgearProducts, tplinkProducts, ubiquitiProducts)
+            print("🛒 Fetching products from Firebase store collection...")
             
-            // Combine all products
-            var allProducts: [Product] = []
-            allProducts.append(contentsOf: asus)
-            allProducts.append(contentsOf: netgear)
-            allProducts.append(contentsOf: tplink)
-            allProducts.append(contentsOf: ubiquiti)
+            let querySnapshot = try await db.collection("store").getDocuments()
+            var fetchedProducts: [Product] = []
             
-            // Sort by rating and filter out duplicates
-            self.products = Array(Set(allProducts)).sorted { ($0.rating ?? 0) > ($1.rating ?? 0) }
+            for document in querySnapshot.documents {
+                let data = document.data()
+                print("📦 Processing product document: \(document.documentID)")
+                print("📦 Document data: \(data)")
+                
+                if let product = parseProductFromFirestore(data) {
+                    fetchedProducts.append(product)
+                    print("✅ Successfully parsed product: \(product.name)")
+                } else {
+                    print("⚠️ Failed to parse product from document: \(document.documentID)")
+                }
+            }
+            
+            await MainActor.run {
+                self.products = fetchedProducts.sorted { ($0.rating ?? 0) > ($1.rating ?? 0) }
+                self.isLoading = false
+                print("✅ Loaded \(fetchedProducts.count) products from Firebase")
+            }
             
         } catch {
-            self.errorMessage = "Failed to fetch products: \(error.localizedDescription)"
-            // Fallback to mock data with working image URLs
-            self.products = Product.realisticMockProducts
+            print("❌ Error fetching products from Firebase: \(error.localizedDescription)")
+            await MainActor.run {
+                self.errorMessage = "Failed to load products: \(error.localizedDescription)"
+                // Fallback to mock data in case of error
+                self.products = Product.realisticMockProducts
+                self.isLoading = false
+            }
         }
-        */
+    }
+    
+    // Helper method to parse Firestore data into Product model
+    private func parseProductFromFirestore(_ data: [String: Any]) -> Product? {
+        guard let id = data["id"] as? String,
+              let name = data["name"] as? String,
+              let description = data["description"] as? String,
+              let price = data["price"] as? Double,
+              let imageURL = data["imageURL"] as? String,
+              let categoryString = data["category"] as? String,
+              let inStock = data["inStock"] as? Bool,
+              let reviewCount = data["reviewCount"] as? Int else {
+            print("❌ Missing required fields in product data")
+            return nil
+        }
         
-        // Use realistic mock data with working Amazon image URLs
-        self.products = Product.realisticMockProducts
+        // Parse category
+        guard let category = Product.ProductCategory(rawValue: categoryString) else {
+            print("❌ Invalid category: \(categoryString)")
+            return nil
+        }
         
-        isLoading = false
+        // Parse optional fields
+        let originalPrice = data["originalPrice"] as? Double
+        let stockCount = data["stockCount"] as? Int
+        let rating = data["rating"] as? Double
+        let brand = data["brand"] as? String
+        let tags = data["tags"] as? [String]
+        let specifications = data["specifications"] as? [String: String]
+        
+        return Product(
+            id: id,
+            name: name,
+            description: description,
+            price: price,
+            originalPrice: originalPrice,
+            imageURL: imageURL,
+            category: category,
+            inStock: inStock,
+            stockCount: stockCount,
+            rating: rating,
+            reviewCount: reviewCount,
+            specifications: specifications,
+            brand: brand,
+            tags: tags
+        )
     }
     
     func fetchProductsByCategory(_ category: Product.ProductCategory) async {

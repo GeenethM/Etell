@@ -6,6 +6,9 @@
 //
 
 import Foundation
+import Firebase
+import FirebaseAuth
+import FirebaseFirestore
 
 @MainActor
 class SpeedTestViewModel: ObservableObject {
@@ -16,6 +19,8 @@ class SpeedTestViewModel: ObservableObject {
     @Published var ping: Double = 0
     @Published var testResults: [SpeedTestResult] = []
     @Published var progress: Double = 0
+    
+    private let db = Firestore.firestore()
     
     enum TestPhase {
         case idle
@@ -36,7 +41,7 @@ class SpeedTestViewModel: ObservableObject {
     }
     
     init() {
-        loadTestHistory()
+        // Initialize with empty state - will load data when view appears and user is authenticated
     }
     
     func startSpeedTest() async {
@@ -64,7 +69,7 @@ class SpeedTestViewModel: ObservableObject {
         currentTest = .completed
         progress = 1.0
         
-        // Save result
+        // Save result to Firebase
         let result = SpeedTestResult(
             downloadSpeed: downloadSpeed,
             uploadSpeed: uploadSpeed,
@@ -72,6 +77,11 @@ class SpeedTestViewModel: ObservableObject {
             timestamp: Date(),
             location: "Current Location"
         )
+        
+        // Save to Firebase and update local array
+        await saveSpeedTestResult(result)
+        
+        // Add to local array for immediate UI update
         testResults.insert(result, at: 0)
         
         // Reset after delay
@@ -92,13 +102,97 @@ class SpeedTestViewModel: ObservableObject {
         }
     }
     
-    private func loadTestHistory() {
-        // Mock test history
-        testResults = [
-            SpeedTestResult(downloadSpeed: 95.5, uploadSpeed: 45.2, ping: 15.3, timestamp: Date().addingTimeInterval(-3600), location: "Home"),
-            SpeedTestResult(downloadSpeed: 87.3, uploadSpeed: 42.1, ping: 18.7, timestamp: Date().addingTimeInterval(-86400), location: "Home"),
-            SpeedTestResult(downloadSpeed: 102.1, uploadSpeed: 48.9, ping: 12.4, timestamp: Date().addingTimeInterval(-172800), location: "Home")
-        ]
+    // MARK: - Firebase Methods
+    
+    private func saveSpeedTestResult(_ result: SpeedTestResult) async {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("❌ No authenticated user found - cannot save speed test result")
+            return
+        }
+        
+        do {
+            let data = result.toDictionary()
+            print("💾 Saving speed test result for user: \(userId)")
+            print("💾 Result data: \(data)")
+            
+            try await db.collection("users")
+                .document(userId)
+                .collection("speedTests")
+                .document(result.id.uuidString)
+                .setData(data)
+            
+            print("✅ Speed test result saved successfully")
+        } catch {
+            print("❌ Error saving speed test result: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    private func loadUserSpeedTestHistory() async {
+        // Wait a bit for authentication state to stabilize if needed
+        var retryCount = 0
+        let maxRetries = 3
+        
+        while retryCount < maxRetries {
+            guard let userId = Auth.auth().currentUser?.uid else {
+                print("❌ No authenticated user found (attempt \(retryCount + 1)/\(maxRetries)) - cannot load speed test history")
+                
+                if retryCount < maxRetries - 1 {
+                    // Wait a bit for auth state to update
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    retryCount += 1
+                    continue
+                } else {
+                    testResults = []
+                    return
+                }
+            }
+            
+            // User is authenticated, proceed with loading
+            break
+        }
+        
+        guard let userId = Auth.auth().currentUser?.uid else {
+            testResults = []
+            return
+        }
+        
+        do {
+            print("📱 Loading speed test history for user: \(userId)")
+            
+            let querySnapshot = try await db.collection("users")
+                .document(userId)
+                .collection("speedTests")
+                .order(by: "timestamp", descending: true)
+                .limit(to: 50) // Limit to last 50 tests
+                .getDocuments()
+            
+            var loadedResults: [SpeedTestResult] = []
+            
+            for document in querySnapshot.documents {
+                let data = document.data()
+                print("📄 Document data: \(data)")
+                
+                if let result = SpeedTestResult(from: data) {
+                    loadedResults.append(result)
+                } else {
+                    print("⚠️ Failed to parse speed test result from document: \(document.documentID)")
+                    print("⚠️ Document data: \(data)")
+                }
+            }
+            
+            self.testResults = loadedResults
+            print("✅ Loaded \(loadedResults.count) speed test results from Firebase")
+            
+        } catch {
+            print("❌ Error loading speed test history: \(error.localizedDescription)")
+            print("❌ Full error: \(error)")
+            self.testResults = []
+        }
+    }
+    
+    func refreshHistory() async {
+        await loadUserSpeedTestHistory()
     }
     
     func clearHistory() {

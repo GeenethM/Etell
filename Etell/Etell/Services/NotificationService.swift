@@ -9,22 +9,27 @@ import Foundation
 import UserNotifications
 import LocalAuthentication
 
-class NotificationService: ObservableObject {
+@MainActor
+class NotificationService: NSObject, ObservableObject {
     @Published var isAuthorized = false
     @Published var isFaceIDAvailable = false
+    @Published var isTouchIDAvailable = false
+    @Published var isOtherBiometricAvailable = false
     @Published var isFaceIDEnabled = false
     @Published var biometryType: LABiometryType = .none
     
     private let authContext = LAContext()
     
-    init() {
+    override init() {
+        super.init()
         checkNotificationAuthorization()
         checkBiometricAvailability()
+        requestNotificationPermission()
     }
     
     func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.isAuthorized = granted
             }
         }
@@ -32,7 +37,7 @@ class NotificationService: ObservableObject {
     
     private func checkNotificationAuthorization() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.isAuthorized = settings.authorizationStatus == .authorized
             }
         }
@@ -51,14 +56,21 @@ class NotificationService: ObservableObject {
     }
     
     private func checkBiometricAvailability() {
-        var error: NSError?
-        
-        if authContext.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            biometryType = authContext.biometryType
-            isFaceIDAvailable = authContext.biometryType == .faceID || authContext.biometryType == .touchID
-        } else {
-            biometryType = .none
-            isFaceIDAvailable = false
+        Task {
+            let context = LAContext()
+            var error: NSError?
+            
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+                let biometryType = context.biometryType
+                
+                self.isFaceIDAvailable = (biometryType == .faceID)
+                self.isTouchIDAvailable = (biometryType == .touchID)
+                self.isOtherBiometricAvailable = (biometryType == .opticID)
+            } else {
+                self.isFaceIDAvailable = false
+                self.isTouchIDAvailable = false
+                self.isOtherBiometricAvailable = false
+            }
         }
     }
     
@@ -88,9 +100,7 @@ class NotificationService: ObservableObject {
             
             switch error.code {
             case .biometryNotAvailable:
-                DispatchQueue.main.async {
-                    self.isFaceIDAvailable = false
-                }
+                self.isFaceIDAvailable = false
             case .userCancel, .userFallback:
                 // User cancelled or chose to use password
                 break
@@ -112,5 +122,72 @@ class NotificationService: ObservableObject {
     
     func disableFaceID() {
         isFaceIDEnabled = false
+    }
+    
+    // MARK: - Local Notification Helpers
+    
+    func scheduleAppointmentReminder(appointmentId: String, appointmentDateTime: Date, appointmentType: String) {
+        // Calculate notification times
+        let fifteenMinutesBefore = appointmentDateTime.addingTimeInterval(-15 * 60) // 15 minutes before
+        let oneDayBefore = appointmentDateTime.addingTimeInterval(-24 * 60 * 60) // 1 day before
+        
+        // Schedule 1 day before notification
+        if oneDayBefore > Date() {
+            scheduleLocalNotification(
+                identifier: "\(appointmentId)_day_before",
+                title: "Appointment Reminder",
+                body: "You have a \(appointmentType) appointment tomorrow at \(appointmentDateTime.formatted(date: .omitted, time: .shortened))",
+                date: oneDayBefore
+            )
+        }
+        
+        // Schedule 15 minutes before notification
+        if fifteenMinutesBefore > Date() {
+            scheduleLocalNotification(
+                identifier: "\(appointmentId)_fifteen_minutes",
+                title: "Appointment Starting Soon",
+                body: "Your \(appointmentType) appointment starts in 15 minutes",
+                date: fifteenMinutesBefore
+            )
+        }
+        
+        print("✅ Scheduled local notifications for appointment: \(appointmentId)")
+    }
+    
+    private func scheduleLocalNotification(identifier: String, title: String, body: String, date: Date) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.badge = 1
+        
+        // Create date components for the trigger
+        let triggerDate = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: triggerDate, repeats: false)
+        
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("❌ Error scheduling notification: \(error.localizedDescription)")
+            } else {
+                print("✅ Local notification scheduled: \(identifier) for \(date)")
+            }
+        }
+    }
+}
+
+// MARK: - UNUserNotificationCenterDelegate  
+extension NotificationService: UNUserNotificationCenterDelegate {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        // Handle notification tap
+        print("📱 Local notification tapped: \(response.notification.request.content.title)")
+        completionHandler()
+    }
+    
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        // Show notification even when app is in foreground
+        // Handle banner notifications by showing them as alerts
+        completionHandler([.banner, .sound, .badge])
     }
 }

@@ -47,13 +47,29 @@ struct SpeedTestView: View {
             .background(.ultraThinMaterial.opacity(0.5))
             .navigationTitle("Speed Test")
             .navigationBarTitleDisplayMode(.large)
+            .onAppear {
+                Task {
+                    await viewModel.refreshHistory()
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        // Show settings or info
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .foregroundStyle(.secondary)
+                    HStack {
+                        Button {
+                            Task {
+                                await viewModel.refreshHistory()
+                            }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundStyle(.blue)
+                        }
+                        
+                        Button {
+                            // Show settings or info
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -399,13 +415,6 @@ struct ModernTestHistorySection: View {
                     .fontWeight(.bold)
                 
                 Spacer()
-                
-                Button("See All") {
-                    // Show full history
-                }
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundStyle(.blue)
             }
             
             if viewModel.testResults.isEmpty {

@@ -2,7 +2,7 @@
 //  FakeStoreAPIService.swift
 //  Etell
 //
-//  Created by GitHub Copilot on 2025-09-18.
+//  Created by Geeneth 013 on 2025-09-18.
 //
 
 import Foundation

@@ -15,6 +15,7 @@ class AuthViewModel: ObservableObject {
     @Published var email = ""
     @Published var password = ""
     @Published var fullName = ""
+    @Published var routerNumber = ""
     @Published var isLoading = false
     @Published var errorMessage = ""
     @Published var showError = false
@@ -61,7 +62,7 @@ class AuthViewModel: ObservableObject {
             
             // Save Face ID preference and credentials if enabled
             if enableFaceID {
-                _authService.updateUserSettings(
+                try await _authService.updateUserSettings(
                     faceIDEnabled: true,
                     notificationsEnabled: _authService.currentUser?.notificationsEnabled ?? true
                 )
@@ -98,7 +99,7 @@ class AuthViewModel: ObservableObject {
             
             // Save Face ID preference if enabled
             if enableFaceID {
-                _authService.updateUserSettings(
+                try await _authService.updateUserSettings(
                     faceIDEnabled: true,
                     notificationsEnabled: true
                 )

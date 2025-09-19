@@ -7,8 +7,8 @@
 
 import Foundation
 import Combine
-import Firebase
 import FirebaseAuth
+import FirebaseFirestore
 
 class FirebaseAuthService: ObservableObject {
     @Published var currentUser: User?
@@ -45,14 +45,23 @@ class FirebaseAuthService: ObservableObject {
                     // Only update currentUser if we're not in the middle of a signup process
                     if self?.isSigningUp != true {
                         print("🔵 Updating currentUser from auth state listener")
-                        self?.currentUser = User(
-                            id: firebaseUser.uid,
-                            email: firebaseUser.email ?? "",
-                            displayName: firebaseUser.displayName,
-                            profileImageURL: firebaseUser.photoURL?.absoluteString,
-                            faceIDEnabled: false, // You can store this in Firestore
-                            notificationsEnabled: true
-                        )
+                        // Load user data from Firestore instead of creating from Firebase Auth
+                        Task {
+                            do {
+                                try await self?.loadUserData()
+                            } catch {
+                                print("🔴 Error loading user data: \(error.localizedDescription)")
+                                // Fallback to creating user from Firebase Auth data
+                                self?.currentUser = User(
+                                    id: firebaseUser.uid,
+                                    email: firebaseUser.email ?? "",
+                                    displayName: firebaseUser.displayName,
+                                    profileImageURL: firebaseUser.photoURL?.absoluteString,
+                                    faceIDEnabled: false,
+                                    notificationsEnabled: true
+                                )
+                            }
+                        }
                     } else {
                         print("🔵 Skipping currentUser update - signup in progress")
                     }
@@ -86,6 +95,10 @@ class FirebaseAuthService: ObservableObject {
         do {
             let result = try await Auth.auth().signIn(withEmail: email, password: password)
             print("User signed in: \(result.user.uid)")
+            
+            // Load user data from Firestore after successful sign in
+            try await loadUserData()
+            
         } catch {
             print("Sign in error: \(error.localizedDescription)")
             throw error
@@ -149,6 +162,115 @@ class FirebaseAuthService: ObservableObject {
             // Clear flag on error
             isSigningUp = false
             print("🔴 Sign up error: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    // Enhanced signUp method with Firestore user data creation
+    func signUp(email: String, password: String, displayName: String? = nil, routerNumber: String? = nil, faceIDEnabled: Bool = false) async throws {
+        do {
+            print("🟡 Starting enhanced signup with displayName: '\(displayName ?? "nil")', routerNumber: '\(routerNumber ?? "nil")', and faceIDEnabled: \(faceIDEnabled)")
+            
+            // Set flag to prevent auth listener from overriding our user object
+            isSigningUp = true
+            
+            let result = try await Auth.auth().createUser(withEmail: email, password: password)
+            print("🟡 User created: \(result.user.uid)")
+            
+            // Update the display name if provided
+            let changeRequest = result.user.createProfileChangeRequest()
+            let nameToSet = displayName ?? email.components(separatedBy: "@").first
+            changeRequest.displayName = nameToSet
+            print("🟡 About to set displayName to: '\(nameToSet ?? "nil")'")
+            
+            try await changeRequest.commitChanges()
+            print("🟡 DisplayName committed successfully")
+            
+            // Reload the user to ensure the profile update is reflected
+            try await result.user.reload()
+            print("🟡 User reloaded after profile update")
+            
+            // Create user document in Firestore
+            let user = User(
+                id: result.user.uid,
+                email: email,
+                displayName: nameToSet,
+                routerNumber: routerNumber,
+                faceIDEnabled: faceIDEnabled,
+                notificationsEnabled: true
+            )
+            
+            try await createUserDocument(user: user)
+            print("🟡 User document created in Firestore")
+            
+            // Manually update the currentUser
+            DispatchQueue.main.async { [weak self] in
+                print("🟡 Manually updating currentUser with all data")
+                self?.currentUser = user
+                self?.objectWillChange.send()
+                print("🟡 currentUser updated with routerNumber: '\(routerNumber ?? "nil")'")
+                
+                // Clear the signup flag
+                self?.isSigningUp = false
+                print("🟡 isSigningUp flag cleared")
+            }
+            
+        } catch {
+            // Clear flag on error
+            isSigningUp = false
+            print("🔴 Enhanced sign up error: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    // Create user document in Firestore
+    private func createUserDocument(user: User) async throws {
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(user.id)
+        
+        try await userRef.setData(user.toDictionary())
+        print("🟢 User document created successfully in Firestore")
+    }
+    
+    // Load user data from Firestore
+    func loadUserData() async throws {
+        guard let firebaseUser = Auth.auth().currentUser else {
+            throw NSError(domain: "AuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No authenticated user"])
+        }
+        
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(firebaseUser.uid)
+        
+        do {
+            let document = try await userRef.getDocument()
+            
+            if document.exists, let data = document.data() {
+                if let user = User.fromDictionary(data, id: firebaseUser.uid) {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.currentUser = user
+                        print("🟢 User data loaded from Firestore: \(user.displayName ?? "No name")")
+                    }
+                } else {
+                    print("🔴 Failed to parse user data from Firestore")
+                }
+            } else {
+                print("⚠️ User document does not exist in Firestore")
+                // Create user document if it doesn't exist
+                let user = User(
+                    id: firebaseUser.uid,
+                    email: firebaseUser.email ?? "",
+                    displayName: firebaseUser.displayName,
+                    faceIDEnabled: false,
+                    notificationsEnabled: true
+                )
+                try await createUserDocument(user: user)
+                
+                DispatchQueue.main.async { [weak self] in
+                    self?.currentUser = user
+                }
+            }
+        } catch {
+            print("🔴 Error loading user data: \(error.localizedDescription)")
             throw error
         }
     }
@@ -256,14 +378,29 @@ class FirebaseAuthService: ObservableObject {
         try await Auth.auth().sendPasswordReset(withEmail: email)
     }
     
-    func updateUserSettings(faceIDEnabled: Bool, notificationsEnabled: Bool) {
-        guard var user = currentUser else { return }
+    func updateUserSettings(faceIDEnabled: Bool, notificationsEnabled: Bool) async throws {
+        guard var user = currentUser else { 
+            throw NSError(domain: "AuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No current user"])
+        }
+        
+        // Update local user object
         user.faceIDEnabled = faceIDEnabled
         user.notificationsEnabled = notificationsEnabled
-        currentUser = user
         
-        // TODO: Save these settings to Firestore
-        // You can implement Firestore storage for user preferences here
+        // Update Firestore document
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(user.id)
+        
+        try await userRef.updateData([
+            "faceIDEnabled": faceIDEnabled,
+            "notificationsEnabled": notificationsEnabled
+        ])
+        
+        // Update local state after successful Firestore update
+        DispatchQueue.main.async { [weak self] in
+            self?.currentUser = user
+            print("🟢 User settings updated: faceIDEnabled=\(faceIDEnabled), notificationsEnabled=\(notificationsEnabled)")
+        }
     }
     
     func deleteAccount() async throws {
