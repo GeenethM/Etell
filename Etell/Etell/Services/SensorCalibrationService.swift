@@ -2,10 +2,86 @@ import Foundation
 import CoreLocation
 import Network
 import SystemConfiguration.CaptiveNetwork
+import MapKit
 #if !os(macOS)
 import CoreMotion
+import UIKit
 #endif
 import Combine
+
+// MARK: - Data Models
+struct SensorRealtimeData {
+    let timestamp: Date
+    #if !os(macOS)
+    let accelerometerData: CMAccelerometerData?
+    let gyroscopeData: CMGyroData?
+    let magnetometerData: CMMagnetometerData?
+    let barometerData: CMAltitudeData?
+    var acceleration: CMAcceleration = CMAcceleration()
+    var rotation: CMRotationRate = CMRotationRate()
+    var magneticField: CMCalibratedMagneticField = CMCalibratedMagneticField()
+    var attitude: CMAttitude?
+    #endif
+    var wifiSignalStrength: Double
+    let bluetoothDevices: [String]
+    let locationData: CLLocation?
+    var wifiRSSI: Int = -100
+    var wifiSSID: String = ""
+    var relativeAltitude: Double = 0.0
+    var pressure: Double = 0.0
+    var magneticHeading: Double = 0.0
+    var trueHeading: Double = 0.0
+    var stepCount: Int = 0
+    
+    init() {
+        self.timestamp = Date()
+        #if !os(macOS)
+        self.accelerometerData = nil
+        self.gyroscopeData = nil
+        self.magnetometerData = nil
+        self.barometerData = nil
+        #endif
+        self.wifiSignalStrength = 0.0
+        self.bluetoothDevices = []
+        self.locationData = nil
+    }
+}
+
+struct WiFiOptimizationResult {
+    let optimalRouterLocation: SensorCalibrationPoint
+    let recommendedExtenders: [SensorExtenderRecommendation]
+    let coverageAnalysis: SensorCoverageAnalysis
+    let signalPrediction: SignalPredictionMap
+    
+    // Additional properties for enhanced analysis
+    let optimizedLocations: [CLLocationCoordinate2D]
+    let signalImprovements: [String: Double]
+    let recommendations: [String]
+    let estimatedSpeedIncrease: Double
+}
+
+struct SignalPredictionMap {
+    let predictions: [[Double]]
+    let resolution: Double
+}
+
+// MARK: - Cellular Tower Data Structure
+struct CellularTower: Identifiable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+    let name: String
+    let signalStrength: Double // 0.0 to 1.0
+    let range: Double // in meters
+    let provider: String
+    let technology: String // 4G, 5G, etc.
+    let address: String
+    
+    func distance(from location: CLLocationCoordinate2D) -> Double {
+        let towerLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        let userLocation = CLLocation(latitude: location.latitude, longitude: location.longitude)
+        return towerLocation.distance(from: userLocation)
+    }
+}
 
 // MARK: - Data Models
 struct SensorCalibrationPoint {
@@ -25,6 +101,11 @@ struct SensorCalibrationPoint {
     let timestamp: Date
     let distanceFromPrevious: Double // Calculated distance
     let stepCount: Int // Estimated steps taken
+    
+    // NEW: Cellular tower information
+    let nearestTower: CellularTower?
+    let cellularSignalStrength: Double? // If available
+    let distanceToNearestTower: Double?
 }
 
 struct CalibrationSession {
@@ -33,19 +114,7 @@ struct CalibrationSession {
     var endTime: Date?
     var points: [SensorCalibrationPoint] = []
     var referencePoint: SensorCalibrationPoint?
-    var setupData: CalibrationSetupData?
-}
-
-struct WiFiOptimizationResult {
-    let optimalRouterLocation: SensorCalibrationPoint
-    let recommendedExtenders: [SensorExtenderRecommendation]
-    let coverageAnalysis: SensorCoverageAnalysis
-    let signalPrediction: SignalPredictionMap
-}
-
-struct SignalPredictionMap {
-    let predictions: [String: Double] // Using string key instead of CLLocationCoordinate2D
-    let resolution: Double // meters per grid point
+    var setupInfo: [String: Any]? // Generic setup data storage
 }
 
 // Local types for WiFi optimization (to avoid conflicts with other modules)
@@ -85,6 +154,10 @@ class SensorCalibrationService: NSObject, ObservableObject {
     @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var locationError: String?
     
+    // NEW: Cellular tower data
+    @Published var nearbyTowers: [CellularTower] = []
+    @Published var selectedTower: CellularTower?
+    
     // Sensor managers
     private let locationManager = CLLocationManager()
     #if !os(macOS)
@@ -106,6 +179,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
     override init() {
         super.init()
         setupSensors()
+        loadCellularTowers()
     }
     
     // MARK: - Sensor Setup
@@ -162,10 +236,10 @@ class SensorCalibrationService: NSObject, ObservableObject {
     }
     
     // MARK: - Calibration Session Management
-    func startNewSession(setupData: CalibrationSetupData) {
+    func startNewSession(setupInfo: [String: Any]? = nil) {
         currentSession = CalibrationSession(
             startTime: Date(),
-            setupData: setupData
+            setupInfo: setupInfo
         )
         isCalibrating = true
         startSensorUpdates()
@@ -179,6 +253,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
     
     private func startSensorUpdates() {
         // Only start location updates if authorized
+        #if !os(macOS)
         if locationAuthorizationStatus == .authorizedWhenInUse || locationAuthorizationStatus == .authorizedAlways {
             locationManager.startUpdatingLocation()
             locationManager.startUpdatingHeading()
@@ -187,6 +262,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
             print("⚠️ Location not authorized, requesting permission...")
             locationManager.requestWhenInUseAuthorization()
         }
+        #endif
         
         #if !os(macOS)
         if motionManager.isDeviceMotionAvailable {
@@ -220,7 +296,9 @@ class SensorCalibrationService: NSObject, ObservableObject {
     
     private func stopSensorUpdates() {
         locationManager.stopUpdatingLocation()
+        #if !os(macOS)
         locationManager.stopUpdatingHeading()
+        #endif
         stopWiFiMonitoring()
         #if !os(macOS)
         motionManager.stopDeviceMotionUpdates()
@@ -241,6 +319,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
     // MARK: - Calibration Point Capture
     func captureCalibrationPoint(name: String) -> Bool {
         // Check location authorization first
+        #if !os(macOS)
         guard locationAuthorizationStatus == .authorizedWhenInUse || locationAuthorizationStatus == .authorizedAlways else {
             let errorMessage = "Location access required to capture calibration points. Current status: \(locationAuthorizationStatus.description)"
             DispatchQueue.main.async {
@@ -249,6 +328,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
             print("❌ \(errorMessage)")
             return false
         }
+        #endif
         
         guard let session = currentSession,
               let location = lastLocation else {
@@ -275,6 +355,10 @@ class SensorCalibrationService: NSObject, ObservableObject {
         
         let relativeHeight = sensorData.relativeAltitude - (referenceAltitude ?? 0)
         
+        // NEW: Find nearest cellular tower
+        let nearestTower = findNearestTower(to: location.coordinate)
+        let distanceToTower = nearestTower?.distance(from: location.coordinate)
+        
 #if !os(macOS)
         let calibrationPoint = SensorCalibrationPoint(
             name: name,
@@ -289,7 +373,10 @@ class SensorCalibrationService: NSObject, ObservableObject {
             signalStrength: signalStrength,
             timestamp: Date(),
             distanceFromPrevious: distanceFromPrevious,
-            stepCount: sensorData.stepCount
+            stepCount: sensorData.stepCount,
+            nearestTower: nearestTower,
+            cellularSignalStrength: estimateCellularSignalStrength(from: nearestTower, at: location.coordinate),
+            distanceToNearestTower: distanceToTower
         )
 #else
         let calibrationPoint = SensorCalibrationPoint(
@@ -299,13 +386,13 @@ class SensorCalibrationService: NSObject, ObservableObject {
             relativeHeight: relativeHeight,
             magneticHeading: sensorData.magneticHeading,
             trueHeading: sensorData.trueHeading,
-            accelerometerData: nil,
-            gyroscopeData: nil,
-            magnetometerData: nil,
             signalStrength: signalStrength,
             timestamp: Date(),
             distanceFromPrevious: distanceFromPrevious,
-            stepCount: 0
+            stepCount: 0,
+            nearestTower: nearestTower,
+            cellularSignalStrength: estimateCellularSignalStrength(from: nearestTower, at: location.coordinate),
+            distanceToNearestTower: distanceToTower
         )
 #endif
         
@@ -398,6 +485,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
         return nil
         #else
         // Get WiFi SSID using CNCopyCurrentNetworkInfo (requires specific entitlements)
+        #if !os(macOS)
         guard let interfaces = CNCopySupportedInterfaces() as? [String] else { return nil }
         
         for interface in interfaces {
@@ -410,6 +498,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
                 return (ssid: ssid, rssi: estimatedRSSI)
             }
         }
+        #endif
         return nil
         #endif
     }
@@ -429,7 +518,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
     func getCalibratedLocations() -> [CalibratedLocation] {
         guard let session = currentSession else { return [] }
         
-        return session.points.map { point in
+        return session.points.map { point -> CalibratedLocation in
             // Determine location type based on name patterns
             let locationType: LocationType
             let lowercaseName = point.name.lowercased()
@@ -515,7 +604,11 @@ class SensorCalibrationService: NSObject, ObservableObject {
             optimalRouterLocation: optimalLocation,
             recommendedExtenders: extenderRecommendations,
             coverageAnalysis: coverage,
-            signalPrediction: signalMap
+            signalPrediction: signalMap,
+            optimizedLocations: [optimalLocation.location],
+            signalImprovements: ["Overall": Double(extenderRecommendations.count * 10)],
+            recommendations: extenderRecommendations.map { $0.reason },
+            estimatedSpeedIncrease: Double(20 + extenderRecommendations.count * 15)
         )
     }
     
@@ -582,7 +675,7 @@ class SensorCalibrationService: NSObject, ObservableObject {
                     return distance1 < distance2
                 }
             
-            if let strongPoint = nearestStrongPoint {
+            if nearestStrongPoint != nil {
                 let improvement = (0.8 - weakSpot.signalStrength) // Expected improvement
                 
                 let recommendation = SensorExtenderRecommendation(
@@ -632,41 +725,82 @@ class SensorCalibrationService: NSObject, ObservableObject {
     
     private func generateSignalPrediction(points: [SensorCalibrationPoint], routerLocation: SensorCalibrationPoint) -> SignalPredictionMap {
         // Create a prediction map based on calibrated points
-        var predictions: [String: Double] = [:]
+        var predictions: [[Double]] = []
+        let gridSize = 10
         
-        // For demo purposes, predict signal strength based on distance from router
-        for point in points {
-            let distance = CLLocation(latitude: routerLocation.location.latitude, longitude: routerLocation.location.longitude)
-                .distance(from: CLLocation(latitude: point.location.latitude, longitude: point.location.longitude))
-            
-            // Simple distance-based prediction model
-            let predictedSignal = max(0.1, 1.0 - (distance / 50.0))
-            let key = "\(point.location.latitude),\(point.location.longitude)"
-            predictions[key] = predictedSignal
+        // Create a simple grid-based prediction
+        for row in 0..<gridSize {
+            var rowPredictions: [Double] = []
+            for col in 0..<gridSize {
+                // Simulate signal strength based on distance from router
+                let gridPoint = CLLocationCoordinate2D(
+                    latitude: routerLocation.location.latitude + Double(row - gridSize/2) * 0.0001,
+                    longitude: routerLocation.location.longitude + Double(col - gridSize/2) * 0.0001
+                )
+                
+                let distance = CLLocation(latitude: routerLocation.location.latitude, longitude: routerLocation.location.longitude)
+                    .distance(from: CLLocation(latitude: gridPoint.latitude, longitude: gridPoint.longitude))
+                
+                let predictedSignal = max(0.1, 1.0 - (distance / 50.0))
+                rowPredictions.append(predictedSignal)
+            }
+            predictions.append(rowPredictions)
         }
         
         return SignalPredictionMap(predictions: predictions, resolution: 1.0)
     }
+    
+    // MARK: - Cellular Tower Integration
+    private func loadCellularTowers() {
+        // Load cellular tower data (from SignalMapView)
+        nearbyTowers = [
+            CellularTower(coordinate: CLLocationCoordinate2D(latitude: 6.9271, longitude: 79.8612), name: "Colombo Central", signalStrength: 0.9, range: 2000, provider: "Dialog", technology: "5G", address: "World Trade Center, Colombo 01"),
+            CellularTower(coordinate: CLLocationCoordinate2D(latitude: 6.9344, longitude: 79.8428), name: "Fort Tower", signalStrength: 0.85, range: 1800, provider: "Mobitel", technology: "4G", address: "Fort Railway Station, Colombo 01"),
+            CellularTower(coordinate: CLLocationCoordinate2D(latitude: 6.9147, longitude: 79.8731), name: "Bambalapitiya", signalStrength: 0.75, range: 1500, provider: "Hutch", technology: "4G", address: "Galle Road, Bambalapitiya"),
+            CellularTower(coordinate: CLLocationCoordinate2D(latitude: 6.9497, longitude: 79.8608), name: "Slave Island", signalStrength: 0.8, range: 1600, provider: "Airtel", technology: "4G", address: "Sir Chittampalam A. Gardiner Mawatha"),
+            CellularTower(coordinate: CLLocationCoordinate2D(latitude: 6.9065, longitude: 79.8487), name: "Wellawatte", signalStrength: 0.7, range: 1400, provider: "Dialog", technology: "4G", address: "Galle Road, Wellawatte"),
+            CellularTower(coordinate: CLLocationCoordinate2D(latitude: 6.9583, longitude: 79.8750), name: "Kotahena", signalStrength: 0.65, range: 1200, provider: "Mobitel", technology: "4G", address: "Kotahena Junction"),
+            CellularTower(coordinate: CLLocationCoordinate2D(latitude: 6.9022, longitude: 79.8607), name: "Mount Lavinia", signalStrength: 0.82, range: 1700, provider: "Dialog", technology: "5G", address: "Mount Lavinia Hotel Area"),
+            CellularTower(coordinate: CLLocationCoordinate2D(latitude: 6.9390, longitude: 79.8540), name: "Pettah", signalStrength: 0.78, range: 1550, provider: "Hutch", technology: "4G", address: "Main Street, Pettah")
+        ]
+    }
+    
+    private func findNearestTower(to location: CLLocationCoordinate2D) -> CellularTower? {
+        return nearbyTowers.min(by: { tower1, tower2 in
+            tower1.distance(from: location) < tower2.distance(from: location)
+        })
+    }
+    
+    private func estimateCellularSignalStrength(from tower: CellularTower?, at location: CLLocationCoordinate2D) -> Double? {
+        guard let tower = tower else { return nil }
+        
+        let distance = tower.distance(from: location)
+        let maxRange = tower.range
+        
+        // Simple signal strength estimation based on distance
+        // Signal strength decreases with distance and obstacles
+        let distanceRatio = min(distance / maxRange, 1.0)
+        let baseSignal = tower.signalStrength
+        
+        // Apply distance-based attenuation
+        let attenuatedSignal = baseSignal * (1.0 - (distanceRatio * 0.6))
+        
+        return max(0.1, attenuatedSignal)
+    }
+    
+    func updateNearbyTowers(for location: CLLocationCoordinate2D) {
+        // Filter towers within reasonable range (10km)
+        let maxDistance: Double = 10000 // 10km
+        
+        DispatchQueue.main.async {
+            self.nearbyTowers = self.nearbyTowers.filter { tower in
+                tower.distance(from: location) <= maxDistance
+            }.sorted { tower1, tower2 in
+                tower1.distance(from: location) < tower2.distance(from: location)
+            }
+        }
+    }
 }
-
-// MARK: - Real-time Sensor Data
-struct SensorRealtimeData {
-    var relativeAltitude: Double = 0.0
-    var pressure: Double = 0.0
-    var wifiSignalStrength: Double = 0.0 // RSSI-based signal strength (0.0 to 1.0)
-    var wifiRSSI: Int = -100 // Raw RSSI value in dBm
-    var wifiSSID: String = "" // Current WiFi network name
-    #if !os(macOS)
-    var acceleration: CMAcceleration = CMAcceleration()
-    var rotation: CMRotationRate = CMRotationRate()
-    var magneticField: CMCalibratedMagneticField = CMCalibratedMagneticField()
-    var attitude: CMAttitude?
-    #endif
-    var magneticHeading: Double = 0.0
-    var trueHeading: Double = 0.0
-    var stepCount: Int = 0
-}
-
 // MARK: - Location Manager Delegate
 extension SensorCalibrationService: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {

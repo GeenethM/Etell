@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import SceneKit
 import MapKit
 import CoreLocation
@@ -16,20 +17,24 @@ struct WiFiOptimizationResultsView: View {
     @State private var selectedTab = 0
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
-                // Tab Selector
+                // Modern Tab Selector with improved spacing
                 Picker("View", selection: $selectedTab) {
-                    Text("Recommendations").tag(0)
-                    Text("3D Analysis").tag(1)
+                    Label("Recommendations", systemImage: "list.bullet.clipboard")
+                        .tag(0)
+                    Label("3D Analysis", systemImage: "cube")
+                        .tag(1)
                 }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding()
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(Color(.systemGroupedBackground))
                 
                 if selectedTab == 0 {
-                    // Recommendations View
+                    // Recommendations View with improved spacing
                     ScrollView {
-                        VStack(spacing: 20) {
+                        LazyVStack(spacing: 16) {
                             // Overall Coverage Summary
                             CoverageSummaryCard(results: results, points: calibrationPoints)
                             
@@ -45,10 +50,12 @@ struct WiFiOptimizationResultsView: View {
                             // Performance Insights
                             PerformanceInsightsCard(results: results, points: calibrationPoints)
                         }
-                        .padding()
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
                     }
+                    .background(Color(.systemGroupedBackground))
                 } else {
-                    // 3D Visualization View
+                    // 3D Visualization View with improved layout
                     let calibratedLocations = calibrationPoints.map { point in
                         // Determine location type based on name patterns
                         let locationType: LocationType
@@ -96,17 +103,25 @@ struct WiFiOptimizationResultsView: View {
                 }
             }
             .navigationTitle("WiFi Optimization")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
                         dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Share") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
                         shareResults()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.title3)
+                            .fontWeight(.medium)
                     }
                 }
             }
@@ -145,54 +160,68 @@ struct CoverageSummaryCard: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             HStack {
-                Image(systemName: "wifi.circle.fill")
-                    .foregroundColor(coverageColor)
-                    .font(.title2)
-                Text("WiFi Coverage Analysis")
-                    .font(.headline)
+                HStack(spacing: 12) {
+                    Image(systemName: "wifi.circle.fill")
+                        .foregroundStyle(coverageColor.gradient)
+                        .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("WiFi Coverage Analysis")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Network performance overview")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Spacer()
             }
             
-            HStack(spacing: 20) {
-                VStack {
+            HStack(spacing: 0) {
+                VStack(spacing: 8) {
                     Text("\(Int(averageSignalStrength * 100))%")
-                        .font(.title)
+                        .font(.largeTitle)
                         .fontWeight(.bold)
-                        .foregroundColor(coverageColor)
+                        .foregroundStyle(coverageColor.gradient)
                     Text("Average Signal")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity)
                 
-                VStack {
+                VStack(spacing: 8) {
                     Text(coverageQuality)
                         .font(.title2)
                         .fontWeight(.semibold)
-                        .foregroundColor(coverageColor)
+                        .foregroundStyle(coverageColor)
                     Text("Overall Quality")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity)
                 
-                VStack {
+                VStack(spacing: 8) {
                     Text("\(points.count)")
-                        .font(.title)
+                        .font(.largeTitle)
                         .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                    Text("Locations Tested")
+                        .foregroundStyle(.blue.gradient)
+                    Text("Locations")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
                 }
-                
-                Spacer()
+                .frame(maxWidth: .infinity)
             }
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .gray.opacity(0.1), radius: 5)
+        .padding(20)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
 }
 
@@ -201,50 +230,62 @@ struct OptimalRouterCard: View {
     let results: WiFiOptimizationResult
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             HStack {
-                Image(systemName: "router.fill")
-                    .foregroundColor(.blue)
-                    .font(.title2)
-                Text("Optimal Router Location")
-                    .font(.headline)
+                HStack(spacing: 12) {
+                    Image(systemName: "router.fill")
+                        .foregroundStyle(.blue.gradient)
+                        .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Optimal Router Location")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Recommended placement")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Spacer()
                 Image(systemName: "star.fill")
-                    .foregroundColor(.yellow)
+                    .foregroundStyle(.yellow.gradient)
                     .font(.title3)
+                    .symbolRenderingMode(.hierarchical)
             }
             
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("📍 Recommended Location:")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Spacer()
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text(results.optimalRouterLocation.name)
                         .font(.title3)
                         .fontWeight(.semibold)
-                        .foregroundColor(.blue)
+                        .foregroundStyle(.primary)
                     
-                    HStack {
-                        Label("Height: \(String(format: "%.1f m", results.optimalRouterLocation.relativeHeight))", systemImage: "arrow.up.circle")
-                        Spacer()
+                    HStack(spacing: 20) {
+                        Label("Height: \(String(format: "%.1f m", results.optimalRouterLocation.relativeHeight))", systemImage: "arrow.up.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
                         Label("Signal: \(Int(results.optimalRouterLocation.signalStrength * 100))%", systemImage: "wifi")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .font(.caption)
-                    .foregroundColor(.secondary)
                 }
                 
                 Divider()
+                    .background(Color(.systemGray4))
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("💡 Why this location?")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundStyle(.orange.gradient)
+                            .font(.caption)
+                        Text("Why this location?")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 8) {
                         RecommendationBullet(text: "Central position provides optimal coverage distribution")
                         RecommendationBullet(text: "Good height for signal propagation")
                         RecommendationBullet(text: "Minimal interference from walls and obstacles")
@@ -253,10 +294,10 @@ struct OptimalRouterCard: View {
                 }
             }
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .gray.opacity(0.1), radius: 5)
+        .padding(20)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
 }
 // MARK: - Extender Recommendations Card
@@ -264,49 +305,65 @@ struct ExtenderRecommendationsCard: View {
     let results: WiFiOptimizationResult
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             HStack {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .foregroundColor(.orange)
-                    .font(.title2)
-                Text("WiFi Extender Recommendations")
-                    .font(.headline)
+                HStack(spacing: 12) {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .foregroundStyle(.orange.gradient)
+                        .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("WiFi Extender Recommendations")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Optimize network coverage")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Spacer()
             }
             
             if results.recommendedExtenders.isEmpty {
-                VStack(spacing: 12) {
+                VStack(spacing: 16) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.title)
-                    Text("No extenders needed!")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.green)
-                    Text("Your current router placement provides excellent coverage throughout the tested areas.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.green.gradient)
+                        .font(.largeTitle)
+                        .symbolRenderingMode(.hierarchical)
+                    
+                    VStack(spacing: 8) {
+                        Text("No extenders needed!")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.green)
+                        Text("Your current router placement provides excellent coverage throughout the tested areas.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 }
-                .padding()
-                .background(Color.green.opacity(0.1))
-                .cornerRadius(12)
+                .padding(20)
+                .background(Color.green.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             } else {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     Text("We recommend \(results.recommendedExtenders.count) extender(s) for optimal coverage:")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                     
-                    ForEach(Array(results.recommendedExtenders.enumerated()), id: \.offset) { index, extender in
-                        ExtenderRecommendationRow(extender: extender, index: index + 1)
+                    VStack(spacing: 12) {
+                        ForEach(Array(results.recommendedExtenders.enumerated()), id: \.offset) { index, extender in
+                            ExtenderRecommendationRow(extender: extender, index: index + 1)
+                        }
                     }
                 }
             }
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .gray.opacity(0.1), radius: 5)
+        .padding(20)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
 }
 struct ExtenderRecommendationRow: View {
@@ -314,41 +371,41 @@ struct ExtenderRecommendationRow: View {
     let index: Int
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(Color.orange)
-                    .frame(width: 30, height: 30)
+                    .fill(Color.orange.gradient)
+                    .frame(width: 32, height: 32)
                 Text("\(index)")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .font(.footnote)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
             }
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(extender.location)
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundStyle(.primary)
                 
-                HStack {
-                    Text("Floor: \(extender.floor)")
-                    Text("•")
-                    Text("Type: \(extender.type == .roomExtender ? "Room" : "Hallway")")
+                HStack(spacing: 8) {
+                    Label("Floor \(extender.floor)", systemImage: "building.2")
+                    Label(extender.type == .roomExtender ? "Room" : "Hallway", systemImage: "location")
                 }
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 
                 Text(extender.reason)
                     .font(.caption)
-                    .foregroundColor(.orange)
+                    .foregroundStyle(.orange)
                     .fontWeight(.medium)
             }
             
             Spacer()
         }
-        .padding()
-        .background(Color.orange.opacity(0.05))
-        .cornerRadius(10)
+        .padding(16)
+        .background(Color.orange.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -361,26 +418,36 @@ struct LocationAnalysisCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             HStack {
-                Image(systemName: "location.circle.fill")
-                    .foregroundColor(.purple)
-                    .font(.title2)
-                Text("Location-by-Location Analysis")
-                    .font(.headline)
+                HStack(spacing: 12) {
+                    Image(systemName: "location.circle.fill")
+                        .foregroundStyle(.purple.gradient)
+                        .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Location Analysis")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Detailed signal breakdown")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Spacer()
             }
             
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(spacing: 12) {
                 ForEach(sortedPoints, id: \.id) { point in
                     LocationAnalysisRow(point: point)
                 }
             }
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .gray.opacity(0.1), radius: 5)
+        .padding(20)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
 }
 
@@ -420,45 +487,49 @@ struct LocationAnalysisRow: View {
             }
             
             var body: some View {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(point.name)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
-                            Text("Height: \(String(format: "%.1f m", point.relativeHeight))")
+                                .foregroundStyle(.primary)
+                            
+                            Label("Height: \(String(format: "%.1f m", point.relativeHeight))", systemImage: "arrow.up.circle")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                         }
                         
                         Spacer()
                         
-                        VStack(alignment: .trailing, spacing: 2) {
-                            HStack(spacing: 4) {
+                        VStack(alignment: .trailing, spacing: 4) {
+                            HStack(spacing: 6) {
                                 Text("\(Int(point.signalStrength * 100))%")
                                     .font(.title3)
                                     .fontWeight(.bold)
-                                    .foregroundColor(signalColor)
+                                    .foregroundStyle(signalColor)
                                 Circle()
-                                    .fill(signalColor)
-                                    .frame(width: 8, height: 8)
+                                    .fill(signalColor.gradient)
+                                    .frame(width: 10, height: 10)
                             }
                             Text(signalQuality)
                                 .font(.caption)
-                                .foregroundColor(signalColor)
+                                .foregroundStyle(signalColor)
                                 .fontWeight(.medium)
                         }
                     }
                     
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(recommendations, id: \.self) { rec in
-                            RecommendationBullet(text: rec)
+                    if !recommendations.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(recommendations, id: \.self) { rec in
+                                RecommendationBullet(text: rec)
+                            }
                         }
                     }
                 }
-                .padding()
-                .background(signalColor.opacity(0.05))
-                .cornerRadius(10)
+                .padding(16)
+                .background(signalColor.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
         
@@ -484,51 +555,69 @@ struct PerformanceInsightsCard: View {
             }
             
             var body: some View {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 20) {
                     HStack {
-                        Image(systemName: "chart.line.uptrend.xyaxis.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.title2)
-                        Text("Performance Insights")
-                            .font(.headline)
+                        HStack(spacing: 12) {
+                            Image(systemName: "chart.line.uptrend.xyaxis.circle.fill")
+                                .foregroundStyle(.green.gradient)
+                                .font(.title2)
+                                .symbolRenderingMode(.hierarchical)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Performance Insights")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                Text("Coverage statistics")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                         Spacer()
                     }
                     
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 20) {
                         // Coverage Statistics
-                        HStack(spacing: 20) {
-                            VStack {
+                        HStack(spacing: 0) {
+                            VStack(spacing: 8) {
                                 Text("\(strongSignalAreas)")
-                                    .font(.title2)
+                                    .font(.largeTitle)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.green)
+                                    .foregroundStyle(.green.gradient)
                                 Text("Strong Areas")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.secondary)
                             }
+                            .frame(maxWidth: .infinity)
                             
-                            VStack {
+                            VStack(spacing: 8) {
                                 Text("\(weakSignalAreas)")
-                                    .font(.title2)
+                                    .font(.largeTitle)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.red)
+                                    .foregroundStyle(.red.gradient)
                                 Text("Weak Areas")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.secondary)
                             }
-                            
-                            Spacer()
+                            .frame(maxWidth: .infinity)
                         }
                         
                         Divider()
+                            .background(Color(.systemGray4))
                         
                         // Recommendations Summary
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("📊 Key Insights:")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "chart.bar.fill")
+                                    .foregroundStyle(.blue.gradient)
+                                    .font(.caption)
+                                Text("Key Insights")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
                             
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 RecommendationBullet(text: estimatedImprovement)
                                 
                                 if weakSignalAreas > 0 {
@@ -544,10 +633,10 @@ struct PerformanceInsightsCard: View {
                         }
                     }
                 }
-                .padding()
-                .background(Color.white)
-                .cornerRadius(16)
-                .shadow(color: .gray.opacity(0.1), radius: 5)
+                .padding(20)
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
             }
         }
         
@@ -557,13 +646,14 @@ struct RecommendationBullet: View {
     let text: String
     
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
-            Text("•")
-                .foregroundColor(.blue)
-                .fontWeight(.bold)
-            Text(text)
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.blue.gradient)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .symbolRenderingMode(.hierarchical)
+            Text(text)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -1262,7 +1352,10 @@ struct HeightAnalysisCard: View {
                 signalStrength: 0.9,
                 timestamp: Date(),
                 distanceFromPrevious: 0.0,
-                stepCount: 0
+                stepCount: 0,
+                nearestTower: nil,
+                cellularSignalStrength: nil,
+                distanceToNearestTower: nil
             ),
             recommendedExtenders: [],
             coverageAnalysis: SensorCoverageAnalysis(
@@ -1271,7 +1364,11 @@ struct HeightAnalysisCard: View {
                 weakAreas: 2,
                 coveragePercentage: 85.0
             ),
-            signalPrediction: SignalPredictionMap(predictions: [:], resolution: 1.0)
+            signalPrediction: SignalPredictionMap(predictions: [[0.8, 0.7], [0.6, 0.5]], resolution: 1.0),
+            optimizedLocations: [CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)],
+            signalImprovements: ["Living Room": 25.0, "Kitchen": 15.0],
+            recommendations: ["Move router to central location", "Add extender in basement"],
+            estimatedSpeedIncrease: 35.0
         ),
         calibrationPoints: []
     )

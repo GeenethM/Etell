@@ -29,9 +29,6 @@ struct DashboardView: View {
                     // Data Usage Overview
                     DataUsageOverviewCard()
                     
-                    // Flash Deals Section
-                    FlashDealsSection()
-                    
                     // Quick Actions Grid
                     QuickActionsGrid()
                     
@@ -507,7 +504,7 @@ struct EnhancedQuickActionCard: View {
                         
                         Spacer()
                     }
-                    .padding(.top, 16)
+                    .padding(.top, 28)
                     
                     // Arrow indicator
                     VStack {
@@ -518,7 +515,7 @@ struct EnhancedQuickActionCard: View {
                                 .fontWeight(.medium)
                                 .foregroundStyle(.white.opacity(0.8))
                                 .padding(.trailing, 12)
-                                .padding(.top, 12)
+                                .padding(.top, 24)
                         }
                         Spacer()
                     }

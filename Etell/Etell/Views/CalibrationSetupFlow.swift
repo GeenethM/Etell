@@ -50,12 +50,12 @@ struct CalibrationSetupFlow: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Progress indicator
                 ProgressBar(currentStep: currentStep, totalSteps: 3)
-                    .padding(.horizontal)
-                    .padding(.top)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
                 
                 // Step content
                 TabView(selection: $currentStep) {
@@ -68,15 +68,20 @@ struct CalibrationSetupFlow: View {
                     HallwaysStep(setupData: $setupData, currentStep: $currentStep, onComplete: onComplete)
                         .tag(2)
                 }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                .animation(.easeInOut, value: currentStep)
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .animation(.easeInOut(duration: 0.3), value: currentStep)
             }
+            .background(Color(UIColor.systemGroupedBackground))
             .navigationTitle("Wi-Fi Environment Setup")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
                         dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -90,15 +95,16 @@ struct ProgressBar: View {
     let totalSteps: Int
     
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             ForEach(0..<totalSteps, id: \.self) { step in
-                Circle()
-                    .fill(step <= currentStep ? Color.blue : Color.gray.opacity(0.3))
-                    .frame(width: 10, height: 10)
-                    .animation(.easeInOut, value: currentStep)
+                Capsule()
+                    .fill(step <= currentStep ? Color.blue : Color(UIColor.systemGray4))
+                    .frame(height: 6)
+                    .frame(maxWidth: step <= currentStep ? .infinity : 40)
+                    .animation(.easeInOut(duration: 0.3), value: currentStep)
             }
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 16)
     }
 }
 
@@ -108,20 +114,20 @@ struct EnvironmentTypeStep: View {
     @Binding var currentStep: Int
     
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 32) {
             Spacer()
             
-            VStack(spacing: 16) {
+            VStack(spacing: 20) {
                 Text("Where are you setting up Wi-Fi?")
                     .font(.title2)
-                    .fontWeight(.bold)
+                    .fontWeight(.semibold)
                     .multilineTextAlignment(.center)
                 
                 Text("Select the environment that best matches your location")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                    .padding(.horizontal, 20)
             }
             
             VStack(spacing: 16) {
@@ -134,29 +140,32 @@ struct EnvironmentTypeStep: View {
                     }
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
             
             Spacer()
             
             // Next Button
             Button(action: {
                 if setupData.environmentType != nil {
-                    withAnimation {
+                    withAnimation(.easeInOut(duration: 0.3)) {
                         currentStep = 1
                     }
                 }
             }) {
-                Text("Next")
+                Text("Continue")
                     .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(setupData.environmentType != nil ? Color.blue : Color.gray)
-                    .cornerRadius(12)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(
+                        setupData.environmentType != nil ? 
+                        Color.blue : Color(UIColor.systemGray4)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
             .disabled(setupData.environmentType == nil)
-            .padding(.horizontal)
-            .padding(.bottom, 30)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 34)
         }
     }
 }
@@ -171,42 +180,43 @@ struct EnvironmentOptionCard: View {
         Button(action: action) {
             HStack(spacing: 16) {
                 Image(systemName: type.icon)
-                    .font(.system(size: 24))
-                    .foregroundColor(isSelected ? .blue : .gray)
-                    .frame(width: 40)
+                    .font(.title2)
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(isSelected ? Color.blue.opacity(0.1) : Color(UIColor.systemGray6))
+                    )
                 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(type.rawValue)
                         .font(.headline)
-                        .foregroundColor(.primary)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
                     
                     Text(type.description)
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundStyle(.secondary)
                 }
                 
                 Spacer()
                 
-                Circle()
-                    .strokeBorder(isSelected ? Color.blue : Color.gray, lineWidth: 2)
-                    .background(Circle().fill(isSelected ? Color.blue : Color.clear))
-                    .frame(width: 24, height: 24)
-                    .overlay(
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                            .opacity(isSelected ? 1 : 0)
-                    )
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .symbolRenderingMode(.hierarchical)
             }
-            .padding()
-            .background(Color.white)
+            .padding(20)
+            .background(Color(UIColor.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.blue : Color.gray.opacity(0.2), lineWidth: isSelected ? 2 : 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(isSelected ? Color.blue : Color(UIColor.systemGray4), lineWidth: isSelected ? 2 : 1)
             )
-            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
     }
 }
 
@@ -216,20 +226,20 @@ struct FloorsStep: View {
     @Binding var currentStep: Int
     
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 32) {
             Spacer()
             
-            VStack(spacing: 16) {
+            VStack(spacing: 20) {
                 Text("How many floors?")
                     .font(.title2)
-                    .fontWeight(.bold)
+                    .fontWeight(.semibold)
                     .multilineTextAlignment(.center)
                 
                 Text("This helps us understand your space layout")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                    .padding(.horizontal, 20)
             }
             
             VStack(spacing: 16) {
@@ -242,49 +252,48 @@ struct FloorsStep: View {
                     }
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
             
             Spacer()
             
             // Navigation Buttons
             HStack(spacing: 16) {
                 Button(action: {
-                    withAnimation {
+                    withAnimation(.easeInOut(duration: 0.3)) {
                         currentStep = 0
                     }
                 }) {
                     Text("Back")
                         .font(.headline)
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.clear)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.blue, lineWidth: 1)
-                        )
-                        .cornerRadius(12)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 
                 Button(action: {
                     if setupData.numberOfFloors != nil {
-                        withAnimation {
+                        withAnimation(.easeInOut(duration: 0.3)) {
                             currentStep = 2
                         }
                     }
                 }) {
-                    Text("Next")
+                    Text("Continue")
                         .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(setupData.numberOfFloors != nil ? Color.blue : Color.gray)
-                        .cornerRadius(12)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(
+                            setupData.numberOfFloors != nil ? 
+                            Color.blue : Color(UIColor.systemGray4)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .disabled(setupData.numberOfFloors == nil)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 30)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 34)
         }
     }
 }
@@ -298,43 +307,44 @@ struct FloorOptionCard: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
-                Image(systemName: floors == 1 ? "house" : "building.2")
-                    .font(.system(size: 24))
-                    .foregroundColor(isSelected ? .blue : .gray)
-                    .frame(width: 40)
+                Image(systemName: floors == 1 ? "house.fill" : "building.2.fill")
+                    .font(.title2)
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(isSelected ? Color.blue.opacity(0.1) : Color(UIColor.systemGray6))
+                    )
                 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("\(floors) Floor\(floors > 1 ? "s" : "")")
                         .font(.headline)
-                        .foregroundColor(.primary)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
                     
                     Text(floors == 1 ? "Single level" : "Multiple levels")
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundStyle(.secondary)
                 }
                 
                 Spacer()
                 
-                Circle()
-                    .strokeBorder(isSelected ? Color.blue : Color.gray, lineWidth: 2)
-                    .background(Circle().fill(isSelected ? Color.blue : Color.clear))
-                    .frame(width: 24, height: 24)
-                    .overlay(
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                            .opacity(isSelected ? 1 : 0)
-                    )
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .symbolRenderingMode(.hierarchical)
             }
-            .padding()
-            .background(Color.white)
+            .padding(20)
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.blue : Color.gray.opacity(0.2), lineWidth: isSelected ? 2 : 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(isSelected ? Color.blue : Color(.systemGray4), lineWidth: isSelected ? 2 : 1)
             )
-            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
     }
 }
 
@@ -347,20 +357,20 @@ struct HallwaysStep: View {
     let onComplete: ((CalibrationSetupData) -> Void)?
     
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 32) {
             Spacer()
             
-            VStack(spacing: 16) {
+            VStack(spacing: 20) {
                 Text("Are there hallways?")
                     .font(.title2)
-                    .fontWeight(.bold)
+                    .fontWeight(.semibold)
                     .multilineTextAlignment(.center)
                 
                 Text("Hallways can affect Wi-Fi signal distribution")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                    .padding(.horizontal, 20)
             }
             
             VStack(spacing: 16) {
@@ -378,28 +388,24 @@ struct HallwaysStep: View {
                     setupData.hasHallways = false
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
             
             Spacer()
             
             // Navigation Buttons
             HStack(spacing: 16) {
                 Button(action: {
-                    withAnimation {
+                    withAnimation(.easeInOut(duration: 0.3)) {
                         currentStep = 1
                     }
                 }) {
                     Text("Back")
                         .font(.headline)
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.clear)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.blue, lineWidth: 1)
-                        )
-                        .cornerRadius(12)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 
                 Button(action: {
@@ -417,16 +423,19 @@ struct HallwaysStep: View {
                 }) {
                     Text("Start Calibration")
                         .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(setupData.hasHallways != nil ? Color.blue : Color.gray)
-                        .cornerRadius(12)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(
+                            setupData.hasHallways != nil ? 
+                            Color.blue : Color(.systemGray4)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .disabled(setupData.hasHallways == nil)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 30)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 34)
         }
         .fullScreenCover(isPresented: $showingCalibration) {
             EnhancedCalibrationView()
@@ -443,43 +452,44 @@ struct HallwayOptionCard: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
-                Image(systemName: hasHallways ? "rectangle.split.3x1" : "square")
-                    .font(.system(size: 24))
-                    .foregroundColor(isSelected ? .blue : .gray)
-                    .frame(width: 40)
+                Image(systemName: hasHallways ? "rectangle.split.3x1.fill" : "square.fill")
+                    .font(.title2)
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(isSelected ? Color.blue.opacity(0.1) : Color(.systemGray6))
+                    )
                 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(hasHallways ? "Yes" : "No")
                         .font(.headline)
-                        .foregroundColor(.primary)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
                     
                     Text(hasHallways ? "Has hallways or corridors" : "Open floor plan")
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundStyle(.secondary)
                 }
                 
                 Spacer()
                 
-                Circle()
-                    .strokeBorder(isSelected ? Color.blue : Color.gray, lineWidth: 2)
-                    .background(Circle().fill(isSelected ? Color.blue : Color.clear))
-                    .frame(width: 24, height: 24)
-                    .overlay(
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                            .opacity(isSelected ? 1 : 0)
-                    )
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .symbolRenderingMode(.hierarchical)
             }
-            .padding()
-            .background(Color.white)
+            .padding(20)
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.blue : Color.gray.opacity(0.2), lineWidth: isSelected ? 2 : 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(isSelected ? Color.blue : Color(.systemGray4), lineWidth: isSelected ? 2 : 1)
             )
-            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
     }
 }
 

@@ -18,17 +18,13 @@ struct SensorBasedCalibrationView: View {
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
-                LinearGradient(
-                    gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.white]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                Color(UIColor.systemGroupedBackground)
+                    .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 24) {
                         if calibrationInstructions {
                             InstructionsView(
                                 setupData: setupData,
@@ -43,34 +39,43 @@ struct SensorBasedCalibrationView: View {
                                 totalLocations: totalLocationsToCalibrate,
                                 onComplete: completeCalibration
                             )
+                            
+                            // Cellular Tower Information
+                            if !sensorService.nearbyTowers.isEmpty {
+                                CellularTowerOverlayView(towers: sensorService.nearbyTowers)
+                            }
                         }
                     }
-                    .padding(.bottom, 20) // Extra bottom padding for scrolling
+                    .padding(.bottom, 34)
                 }
             }
             .navigationTitle("WiFi Calibration")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
                         sensorService.endCurrentSession()
                         dismiss()
                     }
+                    .foregroundStyle(.secondary)
                 }
                 
                 if !calibrationInstructions && (sensorService.currentSession?.points.count ?? 0) >= 3 {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        HStack {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        HStack(spacing: 16) {
                             Button(action: {
                                 showingRoom3DView = true
                             }) {
                                 Image(systemName: "cube")
+                                    .font(.title3)
+                                    .foregroundStyle(.blue)
                             }
                             
                             Button("Analyze") {
                                 analyzeResults()
                             }
-                            .fontWeight(.semibold)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.blue)
                         }
                     }
                 }
@@ -103,7 +108,7 @@ struct SensorBasedCalibrationView: View {
     
     private func startCalibration() {
         calibrationInstructions = false
-        sensorService.startNewSession(setupData: setupData)
+        sensorService.startNewSession()
     }
     
     private func captureCurrentLocation() {
@@ -235,21 +240,24 @@ struct InstructionsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 30) {
-                VStack(spacing: 16) {
+            VStack(spacing: 32) {
+                VStack(spacing: 20) {
                     Image(systemName: "sensor.tag.radiowaves.forward")
-                        .font(.system(size: 60))
-                        .foregroundColor(.blue)
+                        .font(.system(size: 64))
+                        .foregroundStyle(.blue.gradient)
+                        .symbolRenderingMode(.hierarchical)
                     
-                    Text("Advanced WiFi Calibration")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .multilineTextAlignment(.center)
-                    
-                    Text("Using iPhone sensors for precise measurements")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                    VStack(spacing: 8) {
+                        Text("Advanced WiFi Calibration")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .multilineTextAlignment(.center)
+                        
+                        Text("Using iPhone sensors for precise measurements")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 20) {
@@ -278,14 +286,15 @@ struct InstructionsView: View {
                     )
                 }
                 .padding()
-                .background(Color.white)
-                .cornerRadius(16)
-                .shadow(color: .gray.opacity(0.1), radius: 10)
+                .background(Color(UIColor.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
                 
                 VStack(spacing: 16) {
                     Text("Setup Configuration")
                         .font(.headline)
-                        .foregroundColor(.primary)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
                     
                     HStack {
                         Label(setupData.environmentType?.rawValue ?? "Unknown", systemImage: setupData.environmentType?.icon ?? "house")
@@ -295,11 +304,11 @@ struct InstructionsView: View {
                         Label(setupData.hasHallways == true ? "Has Hallways" : "No Hallways", systemImage: "rectangle.split.3x1")
                     }
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                 }
                 .padding()
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(12)
+                .background(Color.blue.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 
                 // Location Permission Status
                 VStack(spacing: 12) {
@@ -352,23 +361,22 @@ struct InstructionsView: View {
                 }
                 .padding()
                 .background(locationPermissionBackgroundColor)
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(locationPermissionColor.opacity(0.3), lineWidth: 1)
                 )
                 
                 Button(action: onStartCalibration) {
-                    HStack {
+                    HStack(spacing: 8) {
                         Image(systemName: "play.fill")
                         Text("Start Sensor Calibration")
-                            .fontWeight(.semibold)
+                            .fontWeight(.medium)
                     }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(isCalibrationEnabled ? Color.blue : Color.gray)
-                    .cornerRadius(12)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(isCalibrationEnabled ? Color.blue : Color(UIColor.systemGray4))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .disabled(!isCalibrationEnabled)
                 
@@ -428,32 +436,36 @@ struct CalibrationActiveView: View {
     }
     
     var body: some View {
-        LazyVStack(spacing: 20) {
+        LazyVStack(spacing: 24) {
             // Progress Section
-            VStack(spacing: 12) {
+            VStack(spacing: 16) {
                 HStack {
                     Text("Calibration Progress")
                         .font(.headline)
+                        .fontWeight(.medium)
                     Spacer()
                     Text("\(completedPoints)/\(totalLocations)")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
+                        .fontWeight(.medium)
                 }
                 
                 ProgressView(value: progress)
-                    .scaleEffect(y: 2)
+                    .scaleEffect(y: 3)
                     .tint(.blue)
+                    .background(Color(UIColor.systemGray5))
+                    .clipShape(Capsule())
                 
                 Text(completedPoints == 0 ? "Go to your first WiFi location" : 
                      completedPoints < totalLocations ? "Move to next WiFi location" : "All locations captured!")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             .padding()
-            .background(Color.white)
-            .cornerRadius(16)
-            .shadow(color: .gray.opacity(0.1), radius: 5)
+            .background(Color(UIColor.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
             
             // Location Status Alert
             if sensorService.locationAuthorizationStatus != .authorizedWhenInUse &&
@@ -530,34 +542,32 @@ struct CalibrationActiveView: View {
                     Button(action: {
                         showingLocationInput = true
                     }) {
-                        HStack {
+                        HStack(spacing: 8) {
                             Image(systemName: "plus.circle.fill")
                             Text("Capture This Location")
-                                .fontWeight(.semibold)
+                                .fontWeight(.medium)
                         }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(canCaptureLocation ? Color.blue : Color.gray)
-                        .cornerRadius(12)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(canCaptureLocation ? Color.blue : Color(UIColor.systemGray4))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                     .disabled(!canCaptureLocation)
                 }
                 
                 if completedPoints >= 3 {
                     Button(action: onComplete) {
-                        HStack {
+                        HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                             Text("Complete Calibration")
-                                .fontWeight(.semibold)
+                                .fontWeight(.medium)
                         }
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity, minHeight: 50)
                         .background(Color.clear)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.blue, lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.blue, lineWidth: 1.5)
                         )
                     }
                 }
@@ -573,27 +583,29 @@ struct SensorDataDisplay: View {
     let sensorData: SensorRealtimeData
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             Text("Live Sensor Readings")
                 .font(.headline)
+                .fontWeight(.medium)
             
             // WiFi Network Info
             if !sensorData.wifiSSID.isEmpty {
-                HStack {
+                HStack(spacing: 12) {
                     Image(systemName: "wifi")
-                        .foregroundColor(.blue)
+                        .foregroundStyle(.blue)
+                        .symbolRenderingMode(.hierarchical)
                     Text("Connected to: \(sensorData.wifiSSID)")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                     Spacer()
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(8)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.blue.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 16) {
                 SensorReadingCard(
                     icon: "barometer",
                     title: "Altitude",
@@ -638,9 +650,9 @@ struct SensorDataDisplay: View {
             }
         }
         .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .gray.opacity(0.1), radius: 5)
+        .background(Color(UIColor.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
     }
     
     private func wifiSignalColor(_ strength: Double) -> Color {
@@ -666,23 +678,25 @@ struct SensorReadingCard: View {
     let color: Color
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundColor(color)
+                .foregroundStyle(color.gradient)
+                .symbolRenderingMode(.hierarchical)
             
             Text(title)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
+                .fontWeight(.medium)
             
             Text(value)
                 .font(.subheadline)
                 .fontWeight(.semibold)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 80)
         .padding()
-        .background(color.opacity(0.1))
-        .cornerRadius(12)
+        .background(color.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -705,39 +719,42 @@ struct LocationInputSheet: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                VStack(spacing: 16) {
+        NavigationStack {
+            VStack(spacing: 32) {
+                VStack(spacing: 20) {
                     Image(systemName: "mappin.and.ellipse")
-                        .font(.system(size: 50))
-                        .foregroundColor(.blue)
+                        .font(.system(size: 56))
+                        .foregroundStyle(.blue.gradient)
+                        .symbolRenderingMode(.hierarchical)
                     
-                    Text("Name This Location")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    VStack(spacing: 4) {
-                        Text("Give this WiFi location a descriptive name")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                    VStack(spacing: 8) {
+                        Text("Name This Location")
+                            .font(.title2)
+                            .fontWeight(.semibold)
                         
-                        // Floor information
-                        if let totalFloors = setupData.numberOfFloors, totalFloors > 1 {
-                            HStack(spacing: 6) {
-                                Image(systemName: "building")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
-                                
-                                Text("Currently calibrating: Floor \(currentFloor) of \(totalFloors)")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.blue)
+                        VStack(spacing: 6) {
+                            Text("Give this WiFi location a descriptive name")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                            
+                            // Floor information
+                            if let totalFloors = setupData.numberOfFloors, totalFloors > 1 {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "building")
+                                        .font(.caption)
+                                        .foregroundStyle(.blue)
+                                    
+                                    Text("Currently calibrating: Floor \(currentFloor) of \(totalFloors)")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.blue)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(.blue.opacity(0.08))
+                                .clipShape(Capsule())
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(.blue.opacity(0.1))
-                            .cornerRadius(8)
                         }
                     }
                 }
@@ -817,12 +834,11 @@ struct LocationInputSheet: View {
                 
                 Button(action: saveLocation) {
                     Text("Capture Location")
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(locationName.isEmpty ? Color.gray : Color.blue)
-                        .cornerRadius(12)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(locationName.isEmpty ? Color(UIColor.systemGray4) : Color.blue)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .disabled(locationName.isEmpty)
             }
@@ -830,10 +846,11 @@ struct LocationInputSheet: View {
             .navigationTitle("Add Location")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundStyle(.secondary)
                 }
             }
         }
@@ -1037,6 +1054,219 @@ extension DateFormatter {
         formatter.timeStyle = .short
         return formatter
     }()
+}
+
+// MARK: - Cellular Tower Overlay View
+struct CellularTowerOverlayView: View {
+    let towers: [CellularTower]
+    @State private var selectedTower: CellularTower?
+    @State private var showingTowerDetails = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .foregroundColor(.blue)
+                Text("Nearby Cellular Towers")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button(action: {
+                    showingTowerDetails = true
+                }) {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(.blue)
+                }
+            }
+            
+            if let nearestTower = towers.first {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(nearestTower.name)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text("\(nearestTower.provider) • \(nearestTower.technology)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            HStack {
+                                Circle()
+                                    .fill(signalColor(for: nearestTower.signalStrength))
+                                    .frame(width: 8, height: 8)
+                                Text("\(Int(nearestTower.signalStrength * 100))%")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                            }
+                            Text("Signal")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    HStack {
+                        Text("Distance:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(Int(nearestTower.range))m range")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+                .onTapGesture {
+                    selectedTower = nearestTower
+                    showingTowerDetails = true
+                }
+            }
+            
+            Text("\(towers.count) towers detected")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .sheet(isPresented: $showingTowerDetails) {
+            CellularTowerDetailsView(towers: towers, selectedTower: selectedTower)
+        }
+    }
+    
+    private func signalColor(for strength: Double) -> Color {
+        if strength > 0.7 {
+            return .green
+        } else if strength > 0.4 {
+            return .orange
+        } else {
+            return .red
+        }
+    }
+}
+
+// MARK: - Cellular Tower Details View
+struct CellularTowerDetailsView: View {
+    let towers: [CellularTower]
+    let selectedTower: CellularTower?
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 16) {
+                    if let selected = selectedTower {
+                        TowerDetailCard(tower: selected, isSelected: true)
+                    }
+                    
+                    ForEach(towers.filter { $0.name != selectedTower?.name }, id: \.name) { tower in
+                        TowerDetailCard(tower: tower, isSelected: false)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Cellular Towers")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct TowerDetailCard: View {
+    let tower: CellularTower
+    let isSelected: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text(tower.name)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    Text(tower.address)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.blue)
+                }
+            }
+            
+            HStack(spacing: 20) {
+                VStack(alignment: .leading) {
+                    Text("Provider")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(tower.provider)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                
+                VStack(alignment: .leading) {
+                    Text("Technology")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(tower.technology)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                
+                VStack(alignment: .leading) {
+                    Text("Signal")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    HStack {
+                        Circle()
+                            .fill(signalColor(for: tower.signalStrength))
+                            .frame(width: 8, height: 8)
+                        Text("\(Int(tower.signalStrength * 100))%")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            HStack {
+                Text("Range: \(Int(tower.range))m")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("Lat: \(String(format: "%.4f", tower.coordinate.latitude)), Lng: \(String(format: "%.4f", tower.coordinate.longitude))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(isSelected ? Color.blue.opacity(0.1) : Color(.systemGray6))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+        )
+    }
+    
+    private func signalColor(for strength: Double) -> Color {
+        if strength > 0.7 {
+            return .green
+        } else if strength > 0.4 {
+            return .orange
+        } else {
+            return .red
+        }
+    }
 }
 
 #Preview {

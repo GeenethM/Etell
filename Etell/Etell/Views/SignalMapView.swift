@@ -77,8 +77,8 @@ struct SignalMapView: View {
     @State private var selectedTechnologies: Set<String> = []
     @State private var minSignalStrength: Double = 0.0
     
-    private let locationManager = CLLocationManager()
-    private let searchCompleter = MKLocalSearchCompleter()
+    private let locationManager: CLLocationManager = CLLocationManager()
+    private let searchCompleter: MKLocalSearchCompleter = MKLocalSearchCompleter()
     
     var filteredTowers: [SignalTower] {
         signalTowers.filter { tower in
